@@ -1,0 +1,37 @@
+{
+  "license": "ISC",
+  "version": "0.0.1",
+  "name": "homebridge-yamaha-avr",
+  "description": "homebridge-plugin - Add Yamaha AVR as TV with input control",
+  "dependencies": {
+    "ip": "^=1.1.5",
+    "yamaha-nodejs": ">=0.9.0"
+  },
+  "engines": {
+    "homebridge": ">=0.2.5",
+    "node": ">=0.12.0"
+  },
+  "author": {
+    "name": "ACDR",
+    "email": "github@acdr.co",
+    "url": "https://github.com/ACDR"
+  },
+  "homepage": "https://github.com/ACDR/homebridge-yamaha-avr#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ACDR/homebridge-yamaha-avr.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ACDR/homebridge-yamaha-avr/issues"
+  },
+  "keywords": [
+    "homebridge-plugin",
+    "YamahaAVR",
+    "Yamaha"
+  ],
+  "main": "index.js",
+  "preferGlobal": true,
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
