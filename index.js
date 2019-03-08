@@ -317,6 +317,8 @@ YamahaAVRAccessory.prototype.remoteKeyPress = function(remoteKey, callback) {
 
       this.playing = !this.playing;
 
+      callback();
+
       break;
     case Characteristic.RemoteKey.INFORMATION:
       // Next Input
