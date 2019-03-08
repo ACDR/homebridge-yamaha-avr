@@ -1,4 +1,5 @@
 const YamahaAPI = require('yamaha-nodejs');
+const fetch = require('node-fetch');
 // https://github.com/christianfl/av-receiver-docs/
 
 let Service;
@@ -66,9 +67,10 @@ function YamahaAVRAccessory(log, config, yamaha, sysConfig, inputs) {
 
   // Configuration
   this.YAMAHA = yamaha;
+  this.config = config;
+  this.sysConfig = sysConfig;
   this.name = config['name'] || 'Yamaha AVR';
   this.inputs = inputs;
-  this.sysConfig = sysConfig;
   this.enabledServices = [];
   this.playing = true;
 
@@ -259,13 +261,9 @@ YamahaAVRAccessory.prototype.setInputState = function(input, callback) {
   callback();
 };
 
-YamahaAVRAccessory.prototype.sendRemoteCommand = function(control, remoteKey, callback) {
-  this.log('Remote', remoteKey);
-
-  const command = `<YAMAHA_AV cmd="PUT"><Main_Zone><Cursor_Control><${control}>${remoteKey}</${control}></Cursor_Control></Main_Zone></YAMAHA_AV>`;
-
-  this.YAMAHA.SendXMLToReceiver(command).then(
-    (RESULT) => {
+YamahaAVRAccessory.prototype.sendRemoteCode = function(remoteKey, callback) {
+  fetch(`http://${this.config['ip']}/YamahaExtendedControl/v1/system/sendIrCode?code=${remoteKey}`).then(
+    (RESPONSE) => {
       callback();
     }
   );
@@ -282,47 +280,48 @@ YamahaAVRAccessory.prototype.remoteKeyPress = function(remoteKey, callback) {
       callback();
       break;
     case Characteristic.RemoteKey.NEXT_TRACK:
-      // TODO: Figure out command for this
-      callback();
+      this.sendRemoteCode('7F016D92', callback);
       break;
     case Characteristic.RemoteKey.PREVIOUS_TRACK:
-      // TODO: Figure out command for this
-      callback();
+      this.sendRemoteCode('7F016C93', callback);
       break;
     case Characteristic.RemoteKey.ARROW_UP:
-      this.sendRemoteCommand('Cursor', 'Up', callback);
+      this.sendRemoteCode('7A859D62', callback);
       break;
     case Characteristic.RemoteKey.ARROW_DOWN:
-      this.sendRemoteCommand('Cursor', 'Down', callback);
+      this.sendRemoteCode('7A859C63', callback);
       break;
     case Characteristic.RemoteKey.ARROW_LEFT:
-      this.sendRemoteCommand('Cursor', 'Left', callback);
+      this.sendRemoteCode('7A859F60', callback);
       break;
     case Characteristic.RemoteKey.ARROW_RIGHT:
-      this.sendRemoteCommand('Cursor', 'Right', callback);
+      this.sendRemoteCode('7A859E61', callback);
       break;
     case Characteristic.RemoteKey.SELECT:
-      this.sendRemoteCommand('Cursor', 'Sel', callback);
+      this.sendRemoteCode('7A85DE21', callback);
       break;
     case Characteristic.RemoteKey.BACK:
-      this.sendRemoteCommand('Cursor', 'Return', callback);
+      this.sendRemoteCode('7A85AA55', callback);
       break;
     case Characteristic.RemoteKey.EXIT:
-      this.sendRemoteCommand('Cursor', 'Return', callback);
+      this.sendRemoteCode('7A85AA55', callback);
       break;
     case Characteristic.RemoteKey.PLAY_PAUSE:
       if (this.playing) {
         this.YAMAHA.pause();
+        // this.sendRemoteCode('7F016798', callback);
       } else {
         this.YAMAHA.play();
+        // this.sendRemoteCode('7F016897', callback);
       }
 
       this.playing = !this.playing;
-      callback();
 
       break;
     case Characteristic.RemoteKey.INFORMATION:
-      this.sendRemoteCommand('Menu_Control', 'Display', callback);
+      // Next Input
+      this.sendRemoteCode('7A851F60', callback);
+
       break;
   }
 };
