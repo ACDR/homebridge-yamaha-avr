@@ -177,10 +177,10 @@ YamahaAVRAccessory.prototype.checkAVRState = function(callback) {
 };
 
 YamahaAVRAccessory.prototype.updateAVRState = function(error, status) {
-  if (status) {
-    if (this.tvService) {
-      this.tvService.getCharacteristic(Characteristic.Active).updateValue(status);
+  if (this.tvService) {
+    this.tvService.getCharacteristic(Characteristic.Active).updateValue(status);
 
+    if (status) {
       this.YAMAHA.getBasicInfo().done(
         (basicInfo) => {
           const input = this.inputs.filter((input, index) => {
