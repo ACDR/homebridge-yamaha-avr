@@ -267,21 +267,10 @@ YamahaAVRAccessory.prototype.setInputState = function(input, callback) {
 YamahaAVRAccessory.prototype.sendRemoteCommand = function(control, remoteKey, callback) {
   this.log('Remote', remoteKey);
 
-  const command = `
-    <YAMAHA_AV cmd="PUT">
-      <Main_Zone>
-        <Cursor_Control>
-          <${control}>
-            ${remoteKey}
-          </${control}>
-        </Cursor_Control>
-      </Main_Zone>
-    </YAMAHA_AV>
-  `;
-
-  this.SendXMLToReceiver(command).then(
+  const command = `<YAMAHA_AV cmd="PUT"><Main_Zone><Cursor_Control><${control}>${remoteKey}</${control}></Cursor_Control></Main_Zone></YAMAHA_AV>`;
+  
+  this.YAMAHA.SendXMLToReceiver(command).then(
     (RESULT) => {
-      this.log(RESULT);
       callback();
     }
   );
