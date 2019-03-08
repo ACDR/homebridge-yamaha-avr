@@ -26,44 +26,48 @@ YamahaAVRPlatform.prototype.accessories = function(callback) {
     (sysConfig) => {
       if (sysConfig && sysConfig.YAMAHA_AV) {
         // Create the Yamaha AVR Accessory
-        callback([
-          new YamahaAVRAccessory(
-            this.log,
-            this.config,
-            this.YAMAHA,
-            sysConfig,
-          )
-        ]);
-
-        // yamaha.getAvailableInputs().then(
-        //   (availableInputs) => {
-        //     callback([
-        //       new YamahaAVRAccessory(
-        //         this.log,
-        //         this.config,
-        //         this.YAMAHA,
-        //         sysConfig,
-        //         availableInputs,
-        //       );
-        //     ]);
-        //   }
-        // );
+        if (this.config['inputs']) {
+          callback([
+            new YamahaAVRAccessory(
+              this.log,
+              this.config,
+              this.YAMAHA,
+              sysConfig,
+              this.config['inputs'],
+            )
+          ]);
+        } else {
+          // If no inputs defined in config - set available inputs as returned from receiver
+          yamaha.getAvailableInputs().then(
+            (availableInputs) => {
+              callback([
+                new YamahaAVRAccessory(
+                  this.log,
+                  this.config,
+                  this.YAMAHA,
+                  sysConfig,
+                  availableInputs,
+                )
+              ]);
+            }
+          );
+        }
       }
     },
-    function(error) {
-      this.log("DEBUG: Failed getSystemConfig from " + name + ", probably just not a Yamaha AVR.");
+    (ERROR) => {
+      this.log(`ERROR: Failed getSystemConfig from ${this.config['name']} probably just not a Yamaha AVR.`);
     }
   );
 }
 
 /* Initialise Yamaha AVR Accessory */
-function YamahaAVRAccessory(log, config, yamaha, sysConfig) {
+function YamahaAVRAccessory(log, config, yamaha, sysConfig, inputs) {
   this.log = log;
 
   // Configuration
   this.YAMAHA = yamaha;
   this.name = config['name'] || 'Yamaha AVR';
-  this.inputs = config['inputs'];
+  this.inputs = inputs;
   this.sysConfig = sysConfig;
   this.enabledServices = [];
   this.playing = true;
@@ -169,14 +173,7 @@ YamahaAVRAccessory.prototype.inputSourceServices = function() {
 
 /* Helpers */
 YamahaAVRAccessory.prototype.checkAVRState = function(callback) {
-  this.YAMAHA.isOn().then(
-    (RESULT) =>  {
-      callback(null, RESULT);
-    },
-    function(ERROR) {
-      callback(ERROR, false);
-    }
-  );
+  this.getPowerState(callback);
 };
 
 YamahaAVRAccessory.prototype.updateAVRState = function(error, status) {
@@ -203,13 +200,11 @@ YamahaAVRAccessory.prototype.updateAVRState = function(error, status) {
 
 /* State Handlers */
 YamahaAVRAccessory.prototype.getPowerState = function(callback) {
-  this.log('Checking power state');
-
   this.YAMAHA.isOn().then(
-    function(RESULT) {
+    (RESULT) => {
       callback(null, RESULT);
     },
-    function(ERROR) {
+    (ERROR) => {
       callback(ERROR, false);
     }
   );
@@ -268,7 +263,7 @@ YamahaAVRAccessory.prototype.sendRemoteCommand = function(control, remoteKey, ca
   this.log('Remote', remoteKey);
 
   const command = `<YAMAHA_AV cmd="PUT"><Main_Zone><Cursor_Control><${control}>${remoteKey}</${control}></Cursor_Control></Main_Zone></YAMAHA_AV>`;
-  
+
   this.YAMAHA.SendXMLToReceiver(command).then(
     (RESULT) => {
       callback();
@@ -287,9 +282,11 @@ YamahaAVRAccessory.prototype.remoteKeyPress = function(remoteKey, callback) {
       callback();
       break;
     case Characteristic.RemoteKey.NEXT_TRACK:
+      // TODO: Figure out command for this
       callback();
       break;
     case Characteristic.RemoteKey.PREVIOUS_TRACK:
+      // TODO: Figure out command for this
       callback();
       break;
     case Characteristic.RemoteKey.ARROW_UP:
