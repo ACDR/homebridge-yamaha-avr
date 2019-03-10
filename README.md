@@ -11,7 +11,7 @@ The Yamaha AVR will display as a TV Accessory with Power, Input, Volume & Remote
 ## Installation
 Install homebridge-yamaha-avr:
 ```sh
-npm install -g homebridge-webos-tv
+npm install -g homebridge-yamaha-avr
 ```
 
 ## Usage Notes
