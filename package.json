@@ -1,10 +1,11 @@
 {
   "license": "UNLICENSED",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "name": "homebridge-yamaha-avr",
   "description": "homebridge-plugin - Add Yamaha AVR as TV with input control",
   "dependencies": {
     "ip": "^=1.1.5",
+    "node-fetch": "^2.3.0",
     "yamaha-nodejs": ">=0.9.0"
   },
   "engines": {
