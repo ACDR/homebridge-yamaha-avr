@@ -6,7 +6,7 @@ The Yamaha AVR will display as a TV Accessory with Power, Input, Volume & Remote
 
 ## Requirements
 * iOS 12.2 (beta)
-* [Homebridge](https://homebridge.io/)
+* [Homebridge](https://homebridge.io/) v0.4.46 (or later)
 
 ## Installation
 Install homebridge-yamaha-avr:
