@@ -164,8 +164,7 @@ YamahaAVRAccessory.prototype.inputSourceServices = function() {
     inputService
       .getCharacteristic(Characteristic.ConfiguredName)
       .on('set', (value, callback) => {
-          log('CREATED INPUT:', value);
-          callback()
+        callback()
       });
 
     this.tvService.addLinkedService(inputService);
