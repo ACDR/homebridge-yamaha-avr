@@ -187,14 +187,12 @@ YamahaAVRAccessory.prototype = {
               // Get and update homekit accessory with the current set input
               if (this.tvService.getCharacteristic(Characteristic.ActiveIdentifier).value !== index) {
                 this.log('Updating input', input.name, input.id);
-                return index;
+                return this.tvService.getCharacteristic(Characteristic.ActiveIdentifier).updateValue(activeInput);
               }
             }
 
             return null;
           });
-
-          this.tvService.getCharacteristic(Characteristic.ActiveIdentifier).updateValue(activeInput);
         });
       }
     }
@@ -244,13 +242,11 @@ YamahaAVRAccessory.prototype = {
       const activeInput = this.inputs.filter((input, index) => {
         if (input.id === basicInfo.getCurrentInput()) {
           this.log(`Current Input: ${input.name}`, index);
-          return index;
+          return callback(null, activeInput);
         }
 
         return null;
       });
-
-      callback(null, activeInput);
     });
   },
 
