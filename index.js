@@ -14,11 +14,6 @@ function YamahaAVRPlatform(log, config) {
   this.YAMAHA = new YamahaAPI(config.ip);
 }
 
-module.exports = (homebridge) => {
-  ({ Service, Characteristic } = homebridge.hap.Service);
-  homebridge.registerPlatform('homebridge-yamaha-avr', 'yamaha-avr', YamahaAVRPlatform);
-};
-
 /* Initialise Yamaha AVR Accessory */
 function YamahaAVRAccessory(log, config, yamaha, sysConfig, inputs) {
   this.log = log;
@@ -38,6 +33,49 @@ function YamahaAVRAccessory(log, config, yamaha, sysConfig, inputs) {
     5000,
   );
 }
+
+module.exports = (homebridge) => {
+  ({ Service, Characteristic } = homebridge.hap.Service);
+  homebridge.registerPlatform('homebridge-yamaha-avr', 'yamaha-avr', YamahaAVRPlatform);
+};
+
+YamahaAVRPlatform.prototype.accessories = (callback) => {
+  // Get Yamaha System Configuration
+  this.YAMAHA.getSystemConfig().then(
+    (sysConfig) => {
+      if (sysConfig && sysConfig.YAMAHA_AV) {
+        // Create the Yamaha AVR Accessory
+        if (this.config.inputs) {
+          callback([
+            new YamahaAVRAccessory(
+              this.log,
+              this.config,
+              this.YAMAHA,
+              sysConfig,
+              this.config.inputs,
+            ),
+          ]);
+        } else {
+          // If no inputs defined in config - set available inputs as returned from receiver
+          this.YAMAHA.getAvailableInputs().then((availableInputs) => {
+            callback([
+              new YamahaAVRAccessory(
+                this.log,
+                this.config,
+                this.YAMAHA,
+                sysConfig,
+                availableInputs,
+              ),
+            ]);
+          });
+        }
+      }
+    },
+    (ERROR) => {
+      this.log(`ERROR: Failed getSystemConfig from ${this.config.name} probably just not a Yamaha AVR.`, ERROR);
+    },
+  );
+};
 
 /* Return Services */
 YamahaAVRAccessory.prototype.getServices = () => {
@@ -287,42 +325,4 @@ YamahaAVRAccessory.prototype.remoteKeyPress = (remoteKey, callback) => {
       callback();
       break;
   }
-};
-
-YamahaAVRPlatform.prototype.accessories = (callback) => {
-  // Get Yamaha System Configuration
-  this.YAMAHA.getSystemConfig().then(
-    (sysConfig) => {
-      if (sysConfig && sysConfig.YAMAHA_AV) {
-        // Create the Yamaha AVR Accessory
-        if (this.config.inputs) {
-          callback([
-            new YamahaAVRAccessory(
-              this.log,
-              this.config,
-              this.YAMAHA,
-              sysConfig,
-              this.config.inputs,
-            ),
-          ]);
-        } else {
-          // If no inputs defined in config - set available inputs as returned from receiver
-          this.YAMAHA.getAvailableInputs().then((availableInputs) => {
-            callback([
-              new YamahaAVRAccessory(
-                this.log,
-                this.config,
-                this.YAMAHA,
-                sysConfig,
-                availableInputs,
-              ),
-            ]);
-          });
-        }
-      }
-    },
-    (ERROR) => {
-      this.log(`ERROR: Failed getSystemConfig from ${this.config.name} probably just not a Yamaha AVR.`, ERROR);
-    },
-  );
 };
