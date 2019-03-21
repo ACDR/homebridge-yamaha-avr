@@ -1,0 +1,15 @@
+{
+    "parser": "babel-eslint",
+    "extends": "eslint-config-airbnb",
+    "env": {
+        "browser": true,
+        "mocha": true,
+        "node": true
+    },
+    "rules": {
+        "max-len": 0,
+        "import/no-named-as-default": 0,
+        "import/no-named-as-default-member": 0,
+        "object-curly-spacing": 0
+    }
+}
