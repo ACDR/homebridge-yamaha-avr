@@ -182,12 +182,12 @@ YamahaAVRAccessory.prototype = {
 
       if (status) {
         this.YAMAHA.getBasicInfo().done((basicInfo) => {
-          const activeInput = this.inputs.filter((input, index) => {
+          this.inputs.filter((input, index) => {
             if (input.id === basicInfo.getCurrentInput()) {
               // Get and update homekit accessory with the current set input
               if (this.tvService.getCharacteristic(Characteristic.ActiveIdentifier).value !== index) {
                 this.log('Updating input', input.name, input.id);
-                return this.tvService.getCharacteristic(Characteristic.ActiveIdentifier).updateValue(activeInput);
+                return this.tvService.getCharacteristic(Characteristic.ActiveIdentifier).updateValue(index);
               }
             }
 
@@ -239,10 +239,10 @@ YamahaAVRAccessory.prototype = {
 
   getInputState(callback) {
     this.YAMAHA.getBasicInfo().done((basicInfo) => {
-      const activeInput = this.inputs.filter((input, index) => {
+      this.inputs.filter((input, index) => {
         if (input.id === basicInfo.getCurrentInput()) {
           this.log(`Current Input: ${input.name}`, index);
-          return callback(null, activeInput);
+          return callback(null, index);
         }
 
         return null;
