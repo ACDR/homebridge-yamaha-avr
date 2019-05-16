@@ -61,3 +61,9 @@ Example configuration:
     ]
   }
 ```
+
+# Other Yamaha Receiver Plugins
+
+## [homebridge-yamaha-zone-tv](https://github.com/NorthernMan54/homebridge-yamaha-zone-tv) For multi-zone Yamaha Receivers, and uses the Television control for each zone of the receiver.
+
+## [homebridge-yamaha-home](https://github.com/NorthernMan54/homebridge-yamaha-home) For multi-zone Yamaha Receivers, and uses a Fan to control each zone of the receiver.
