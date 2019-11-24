@@ -20,7 +20,8 @@ Quickly switch input using the information (i) button in the Control Centre remo
 ## Configuration
 Add a new platform to your homebridge `config.json`.
 
-Specific "favourite" inputs can be added manually or all available inputs reported by the AVR will be set.
+You can filter the available inputs that are presented in HomeKit.  The filtering is done on the "id" field, and the "id" must exactly match the name of the input on the receiver.
+**NOTE** The receiver may rename inputs, e.g. HDMI1 may become AppleTV.  Use the **NON-RENAMED** input name as the "id".
 
 Example configuration:
 
@@ -56,6 +57,16 @@ Example configuration:
             "id": "HDMI5",
             "name": "PlayStation 4"
           }
+        ],
+        "scenes": [
+           {
+              "name": "Watch AppleTV",
+              "index": 1
+           }
+           {
+              "name": "Play PS4",
+              "index": 2
+           }
         ]
       }
     ]

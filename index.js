@@ -13,7 +13,6 @@ function YamahaAVRPlatform(log, config) {
   // create the Yamaha API instance
   this.YAMAHA = new YamahaAPI(config.ip);
 }
-
 /* Initialise Yamaha AVR Accessory */
 function YamahaAVRAccessory(log, config, yamaha, sysConfig, inputs) {
   this.log = log;
@@ -25,7 +24,9 @@ function YamahaAVRAccessory(log, config, yamaha, sysConfig, inputs) {
   this.name = config.name || 'Yamaha AVR';
   this.inputs = inputs;
   this.enabledServices = [];
+  this.availableSceneServices = [];
   this.playing = true;
+  this.scenes = config.scenes;
 
   // Check & Update Accessory Status every 5 seconds
   this.checkStateInterval = setInterval(
@@ -45,31 +46,63 @@ YamahaAVRPlatform.prototype = {
     this.YAMAHA.getSystemConfig().then(
       (sysConfig) => {
         if (sysConfig && sysConfig.YAMAHA_AV) {
-          // Create the Yamaha AVR Accessory
-          if (this.config.inputs) {
+         var sanitizedInputs = [];
+         // If no inputs defined in config - set available inputs as returned from receiver
+         this.YAMAHA.getAvailableInputsWithNames().then((availableInputs) => {
+            //this.log("Got input:", availableInputs);
+            var i = 0;
+            for (var key in availableInputs[0]) {
+               // check if the property/key is defined in the object itself, not in parent
+               if (availableInputs[0].hasOwnProperty(key)) {   
+                  var id = String(key).replace("_", "");       
+                  var input = {
+                     id: id,
+                     name: availableInputs[0][key][0],
+                     index: i  
+                  }
+                  sanitizedInputs.push(input);
+                  i++;
+               }
+            }
+            //this.log(sanitizedInputs);
+            // Create the Yamaha AVR Accessory
+            if (this.config.inputs) {
+               this.log("inputs true");
+            var filteredInputs = []
+            this.config.inputs.forEach((input, i) =>
+            {
+               sanitizedInputs.forEach((sanitizedInput) =>
+               {
+                  if (sanitizedInput.id === input.id)
+                  {
+                     input.index = i;
+                     filteredInputs.push(input);
+                  }
+               });
+            });
             callback([
-              new YamahaAVRAccessory(
-                this.log,
-                this.config,
-                this.YAMAHA,
-                sysConfig,
-                this.config.inputs,
-              ),
-            ]);
-          } else {
-            // If no inputs defined in config - set available inputs as returned from receiver
-            this.YAMAHA.getAvailableInputs().then((availableInputs) => {
-              callback([
-                new YamahaAVRAccessory(
+               new YamahaAVRAccessory(
                   this.log,
                   this.config,
                   this.YAMAHA,
                   sysConfig,
-                  availableInputs,
-                ),
-              ]);
-            });
-          }
+                  filteredInputs,
+               ),
+            ]);
+            } else {
+               this.log("inputs false", sanitizedInputs);
+               callback([
+                  new YamahaAVRAccessory(
+                  this.log,
+                  this.config,
+                  this.YAMAHA,
+                  sysConfig,
+                  sanitizedInputs,
+                  ),
+               ]);
+            
+            }
+         });
         }
       },
       (ERROR) => {
@@ -86,11 +119,47 @@ YamahaAVRAccessory.prototype = {
 
     // Services
     this.informationService();
+    this.volumeService();
     this.televisionService();
     this.televisionSpeakerService();
     this.inputSourceServices();
+    this.sceneServices();
 
     return this.enabledServices;
+  },
+
+  volumeService() {
+   this.volumeService = new Service.Lightbulb(this.name + ' Volume', 'volumeService');
+   this.volumeService
+       .getCharacteristic(Characteristic.On)
+       .on('get', this.getMuteState.bind(this))
+       .on('set', this.setMuteState.bind(this));
+   this.volumeService
+       .addCharacteristic(new Characteristic.Brightness())
+       .on('get', this.getVolume.bind(this))
+       .on('set', this.setVolume.bind(this));
+
+   this.enabledServices.push(this.volumeService);
+  },
+
+  sceneServices() {
+   this.scenes.forEach((scene, i) =>
+   {
+      this.log("scene: ",scene);
+      const sceneService = new Service.Switch(scene.name, `sceneService ${scene.index}`);
+      sceneService
+         .setCharacteristic(Characteristic.Name, scene.name)
+      sceneService
+         .getCharacteristic(Characteristic.On)
+         //.on('get', this.getSceneState.bind(this))
+         .on('set', (value, callback) => {
+            this.setSceneState(i, value, callback);
+         });
+
+         this.tvService.addLinkedService(sceneService);
+      this.enabledServices.push(sceneService);
+      this.availableSceneServices.push(sceneService);
+   });
   },
 
   informationService() {
@@ -123,7 +192,7 @@ YamahaAVRAccessory.prototype = {
       .getCharacteristic(Characteristic.ActiveIdentifier)
       .on('get', this.getInputState.bind(this))
       .on('set', (inputIdentifier, callback) => {
-        this.setInputState(this.inputs[inputIdentifier], callback);
+         this.setInputState(this.inputs[inputIdentifier], callback);
       });
 
     this.tvService
@@ -145,16 +214,26 @@ YamahaAVRAccessory.prototype = {
         this.setVolume(direction, callback);
       });
 
+    this.tvSpeakerService
+        .addCharacteristic(Characteristic.Volume)
+        .on('get', this.getVolume.bind(this))
+        .on('set', this.setVolume.bind(this));
+
+        this.tvSpeakerService
+        .getCharacteristic(Characteristic.Mute)
+        .on('get', this.getMuteState.bind(this))
+        .on('set', this.setMuteState.bind(this));
     this.tvService.addLinkedService(this.tvSpeakerService);
     this.enabledServices.push(this.tvSpeakerService);
   },
 
   inputSourceServices() {
     this.inputs.forEach((input, i) => {
-      const inputService = new Service.InputSource(input.id, `inputSource${i}`);
+       this.log("adding input source ", input.index, input.name, input.id);
+      const inputService = new Service.InputSource(input.id, `inputSource${input.index}`);
 
       inputService
-        .setCharacteristic(Characteristic.Identifier, i)
+        .setCharacteristic(Characteristic.Identifier, input.index)
         .setCharacteristic(Characteristic.ConfiguredName, input.name)
         .setCharacteristic(Characteristic.IsConfigured, Characteristic.IsConfigured.CONFIGURED)
         .setCharacteristic(Characteristic.InputSourceType, Characteristic.InputSourceType.APPLICATION)
@@ -163,12 +242,12 @@ YamahaAVRAccessory.prototype = {
       inputService
         .getCharacteristic(Characteristic.ConfiguredName)
         .on('set', (value, callback) => {
-          callback();
+          callback(null, value);
         });
 
       this.tvService.addLinkedService(inputService);
       this.enabledServices.push(inputService);
-    });
+      });
   },
 
   /* State Handlers */
@@ -179,29 +258,29 @@ YamahaAVRAccessory.prototype = {
   updateAVRState(error, status) {
     if (this.tvService) {
       this.tvService.getCharacteristic(Characteristic.Active).updateValue(status);
-
       if (status) {
         this.YAMAHA.getBasicInfo().done((basicInfo) => {
           this.inputs.filter((input, index) => {
             if (input.id === basicInfo.getCurrentInput()) {
               // Get and update homekit accessory with the current set input
               if (this.tvService.getCharacteristic(Characteristic.ActiveIdentifier).value !== index) {
-                this.log('Updating input', input.name, input.id);
+                this.log(`Updating input from ${input.name} to ${input.name}`);
                 return this.tvService.getCharacteristic(Characteristic.ActiveIdentifier).updateValue(index);
               }
             }
-
             return null;
           });
         });
       }
+      return null;
     }
+    return null;
   },
 
   getPowerState(callback) {
     this.YAMAHA.isOn().then(
       (RESULT) => {
-        callback(null, RESULT);
+         callback(null, RESULT);
       },
       (ERROR) => {
         callback(ERROR, false);
@@ -221,23 +300,50 @@ YamahaAVRAccessory.prototype = {
     callback();
   },
 
-  setVolume(direction, callback) {
-    this.YAMAHA.getBasicInfo().done((basicInfo) => {
-      const volume = basicInfo.getVolume();
+  //The AVR reports volume *10, e.g. 28.5 becomes 285
 
-      if (direction === 0) {
-        this.log('Volume Up', (volume + 5) / 10);
-        this.YAMAHA.volumeUp(5);
-      } else {
-        this.log('Volume Down', (volume - 5) / 10);
-        this.YAMAHA.volumeDown(5);
-      }
+  setVolume(value, callback) {
+   if (value === 0) {
+      this.YAMAHA.muteOn();
+   }
+   else {
+      var volume = Math.round((value/2.5-50)*10);
+      volume = volume - (volume %5);
+      this.log("setting volume to ", volume);
+      this.YAMAHA.setVolumeTo(volume);
+   }
+   callback();
+  },
 
-      callback();
-    });
+  getVolume(callback) {
+   this.YAMAHA.getBasicInfo().done((basicInfo) => {
+     var volume = Math.round((basicInfo.getVolume()/10+50)*2.5);
+     volume = volume - (volume % 5);
+     this.log("The current volume is", volume);
+
+     callback(null, volume);
+   });
+ },
+
+  setMuteState(val, callback) {
+   callback();
+  },
+
+  getMuteState(callback) {
+   this.YAMAHA.getBasicInfo().done((basicInfo) => {
+      
+   const muted = basicInfo.isMuted();
+   callback(null, !muted);
+   });
+  },
+
+  getSceneState(callback) {
+     //scenes are always "off"
+     callback(null, false);
   },
 
   getInputState(callback) {
+     //this.log("getInputState");
     this.YAMAHA.getBasicInfo().done((basicInfo) => {
       this.inputs.filter((input, index) => {
         if (input.id === basicInfo.getCurrentInput()) {
@@ -254,6 +360,25 @@ YamahaAVRAccessory.prototype = {
     this.log(`Set input: ${input.name} (${input.id})`);
     this.YAMAHA.setInputTo(input.id);
     callback();
+  },
+
+  setSceneState(index, value, callback) {
+     if (value == true) {
+      this.scenes.forEach((scene) => {
+      if (scene.index == index+1)
+      {
+         this.availableSceneServices.forEach((service) => {
+            if (service.getCharacteristic(Characteristic.Name).value != scene.name) {
+               service.getCharacteristic(Characteristic.On).updateValue(false);
+            }
+         });
+         this.log(`seting scene ${scene.name} to ${value}`);
+
+      }
+      });
+      this.YAMAHA.setSceneTo(index+1);
+     }
+     callback();
   },
 
   sendRemoteCode(remoteKey, callback) {

@@ -1,13 +1,43 @@
 {
-  "license": "UNLICENSED",
-  "version": "1.0.0",
-  "name": "homebridge-yamaha-avr",
-  "description": "homebridge-plugin - Add Yamaha AVR as TV with input control",
+  "_from": "homebridge-yamaha-avr",
+  "_id": "homebridge-yamaha-avr@1.0.0",
+  "_inBundle": false,
+  "_integrity": "sha512-Dnq64k0VGewswHrEAZP5rYfutqrrmII8NZ/R1vXuO9GdB4lqPxmLDPm1O2LuxIdype/QJD2+cNh8ZYjcXgYXEA==",
+  "_location": "/homebridge-yamaha-avr",
+  "_phantomChildren": {},
+  "_requested": {
+    "type": "tag",
+    "registry": true,
+    "raw": "homebridge-yamaha-avr",
+    "name": "homebridge-yamaha-avr",
+    "escapedName": "homebridge-yamaha-avr",
+    "rawSpec": "",
+    "saveSpec": null,
+    "fetchSpec": "latest"
+  },
+  "_requiredBy": [
+    "#USER"
+  ],
+  "_resolved": "https://registry.npmjs.org/homebridge-yamaha-avr/-/homebridge-yamaha-avr-1.0.0.tgz",
+  "_shasum": "b402b1b30695a4c04401c46f95164ecab468ea25",
+  "_spec": "homebridge-yamaha-avr",
+  "_where": "/Users/Ian/.homebridge",
+  "author": {
+    "name": "ACDR",
+    "email": "github@acdr.co",
+    "url": "https://github.com/ACDR"
+  },
+  "bugs": {
+    "url": "https://github.com/ACDR/homebridge-yamaha-avr/issues"
+  },
+  "bundleDependencies": false,
   "dependencies": {
     "ip": "^=1.1.5",
     "node-fetch": "^2.3.0",
     "yamaha-nodejs": ">=0.9.0"
   },
+  "deprecated": false,
+  "description": "homebridge-plugin - Add Yamaha AVR as TV with input control",
   "devDependencies": {
     "babel-eslint": "^10.0.1",
     "eslint": "^4.19.1",
@@ -20,27 +50,22 @@
     "homebridge": ">=0.2.5",
     "node": ">=0.12.0"
   },
-  "author": {
-    "name": "ACDR",
-    "email": "github@acdr.co",
-    "url": "https://github.com/ACDR"
-  },
   "homepage": "https://github.com/ACDR/homebridge-yamaha-avr#readme",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/ACDR/homebridge-yamaha-avr.git"
-  },
-  "bugs": {
-    "url": "https://github.com/ACDR/homebridge-yamaha-avr/issues"
-  },
   "keywords": [
     "homebridge-plugin",
     "YamahaAVR",
     "Yamaha"
   ],
+  "license": "UNLICENSED",
   "main": "index.js",
+  "name": "homebridge-yamaha-avr",
   "preferGlobal": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ACDR/homebridge-yamaha-avr.git"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
-  }
+  },
+  "version": "1.0.0"
 }
