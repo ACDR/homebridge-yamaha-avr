@@ -49,7 +49,6 @@ YamahaAVRPlatform.prototype = {
          var sanitizedInputs = [];
          // If no inputs defined in config - set available inputs as returned from receiver
          this.YAMAHA.getAvailableInputsWithNames().then((availableInputs) => {
-            //this.log("Got input:", availableInputs);
             var i = 0;
             for (var key in availableInputs[0]) {
                // check if the property/key is defined in the object itself, not in parent
@@ -64,10 +63,8 @@ YamahaAVRPlatform.prototype = {
                   i++;
                }
             }
-            //this.log(sanitizedInputs);
             // Create the Yamaha AVR Accessory
             if (this.config.inputs) {
-               this.log("inputs true");
             var filteredInputs = []
             this.config.inputs.forEach((input, i) =>
             {
@@ -90,7 +87,6 @@ YamahaAVRPlatform.prototype = {
                ),
             ]);
             } else {
-               this.log("inputs false", sanitizedInputs);
                callback([
                   new YamahaAVRAccessory(
                   this.log,
@@ -145,7 +141,7 @@ YamahaAVRAccessory.prototype = {
   sceneServices() {
    this.scenes.forEach((scene, i) =>
    {
-      this.log("scene: ",scene);
+      this.log("Adding scene: ",scene);
       const sceneService = new Service.Switch(scene.name, `sceneService ${scene.index}`);
       sceneService
          .setCharacteristic(Characteristic.Name, scene.name)
@@ -308,7 +304,7 @@ YamahaAVRAccessory.prototype = {
    }
    else {
       var volume = Math.round((value/2.5-50)*10);
-      volume = volume - (volume %5);
+      volume = volume - (volume % 5);
       this.log("setting volume to ", volume);
       this.YAMAHA.setVolumeTo(volume);
    }
