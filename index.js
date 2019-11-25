@@ -267,6 +267,10 @@ YamahaAVRAccessory.prototype = {
             return null;
           });
         });
+      } else {
+         this.availableSceneServices.forEach((service) => {
+            service.getCharacteristic(Characteristic.On).updateValue(false);
+         });
       }
       return null;
     }
