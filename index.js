@@ -15,21 +15,17 @@ function YamahaAVRPlatform(log, config) {
 }
 
 /* Initialise Yamaha AVR Accessory */
-function YamahaAVRAccessory(log, config, yamaha) {
+function YamahaAVRAccessory(log, config, yamaha, sysConfig, inputs) {
   this.log = log;
 
   // Configuration
   this.YAMAHA = yamaha;
   this.config = config;
-  this.sysConfig = null;
+  this.sysConfig = sysConfig;
   this.name = config.name || 'Yamaha AVR';
-  this.inputs = [];
+  this.inputs = inputs;
   this.enabledServices = [];
-  this.inputServices = [];
   this.playing = true;
-
-  this.setConfig();
-  this.setInputs();
 
   // Check & Update Accessory Status every 5 seconds
   this.checkStateInterval = setInterval(
@@ -45,19 +41,50 @@ module.exports = (homebridge) => {
 
 YamahaAVRPlatform.prototype = {
   accessories(callback) {
-    callback([
-      new YamahaAVRAccessory(
-        this.log,
-        this.config,
-        this.YAMAHA,
-      ),
-    ]);
+    // Get Yamaha System Configuration
+    this.YAMAHA.getSystemConfig().then(
+      (sysConfig) => {
+        if (sysConfig && sysConfig.YAMAHA_AV) {
+          // Create the Yamaha AVR Accessory
+          if (this.config.inputs) {
+            callback([
+              new YamahaAVRAccessory(
+                this.log,
+                this.config,
+                this.YAMAHA,
+                sysConfig,
+                this.config.inputs,
+              ),
+            ]);
+          } else {
+            // If no inputs defined in config - set available inputs as returned from receiver
+            this.YAMAHA.getAvailableInputs().then((availableInputs) => {
+              callback([
+                new YamahaAVRAccessory(
+                  this.log,
+                  this.config,
+                  this.YAMAHA,
+                  sysConfig,
+                  availableInputs,
+                ),
+              ]);
+            });
+          }
+        }
+      },
+      (ERROR) => {
+        this.log(`ERROR: Failed getSystemConfig from ${this.config.name} probably just not a Yamaha AVR.`, ERROR);
+      },
+    );
   },
 };
 
 YamahaAVRAccessory.prototype = {
   /* Services */
   getServices() {
+    this.log(`Initialised ${this.name}`);
+
+    // Services
     this.informationService();
     this.televisionService();
     this.televisionSpeakerService();
@@ -73,8 +100,8 @@ YamahaAVRAccessory.prototype = {
       .setCharacteristic(Characteristic.Name, this.name)
       .setCharacteristic(Characteristic.Manufacturer, 'Yamaha')
       // .setCharacteristic(Characteristic.FirmwareRevision, require('./package.json').version)
-      .setCharacteristic(Characteristic.Model, this.sysConfig ? this.sysConfig.YAMAHA_AV.System[0].Config[0].Model_Name[0] : 'Unknown')
-      .setCharacteristic(Characteristic.SerialNumber, this.sysConfig ? this.sysConfig.YAMAHA_AV.System[0].Config[0].System_ID[0] : 'Unknown');
+      .setCharacteristic(Characteristic.Model, this.sysConfig.YAMAHA_AV.System[0].Config[0].Model_Name[0])
+      .setCharacteristic(Characteristic.SerialNumber, this.sysConfig.YAMAHA_AV.System[0].Config[0].System_ID[0]);
 
     this.enabledServices.push(this.informationService);
   },
@@ -107,42 +134,41 @@ YamahaAVRAccessory.prototype = {
   },
 
   televisionSpeakerService() {
-      this.tvSpeakerService = new Service.TelevisionSpeaker(`${this.name} AVR`, 'tvSpeakerService');
-      this.tvSpeakerService
-        .setCharacteristic(Characteristic.Active, Characteristic.Active.ACTIVE)
-        .setCharacteristic(Characteristic.VolumeControlType, Characteristic.VolumeControlType.ABSOLUTE);
+    this.tvSpeakerService = new Service.TelevisionSpeaker(`${this.name} Volume`, 'tvSpeakerService');
+    this.tvSpeakerService
+      .setCharacteristic(Characteristic.Active, Characteristic.Active.ACTIVE)
+      .setCharacteristic(Characteristic.VolumeControlType, Characteristic.VolumeControlType.ABSOLUTE);
 
-      this.tvSpeakerService
-        .getCharacteristic(Characteristic.VolumeSelector)
-        .on('set', (direction, callback) => {
-          this.setVolume(direction, callback);
-        });
+    this.tvSpeakerService
+      .getCharacteristic(Characteristic.VolumeSelector)
+      .on('set', (direction, callback) => {
+        this.setVolume(direction, callback);
+      });
 
-      this.tvService.addLinkedService(this.tvSpeakerService);
-      this.enabledServices.push(this.tvSpeakerService);
+    this.tvService.addLinkedService(this.tvSpeakerService);
+    this.enabledServices.push(this.tvSpeakerService);
   },
 
   inputSourceServices() {
-    for (let i = 0; i < 50; i++) {
-      const inputService = new Service.InputSource(i, `inputSource_${i}`);
+    this.inputs.forEach((input, i) => {
+      const inputService = new Service.InputSource(input.id, `inputSource${i}`);
 
       inputService
         .setCharacteristic(Characteristic.Identifier, i)
-        .setCharacteristic(Characteristic.ConfiguredName, `Input ${i < 9 ? `0${i + 1}` : i + 1}`)
-        .setCharacteristic(Characteristic.IsConfigured, Characteristic.IsConfigured.NOT_CONFIGURED)
+        .setCharacteristic(Characteristic.ConfiguredName, input.name)
+        .setCharacteristic(Characteristic.IsConfigured, Characteristic.IsConfigured.CONFIGURED)
         .setCharacteristic(Characteristic.InputSourceType, Characteristic.InputSourceType.APPLICATION)
-        .setCharacteristic(Characteristic.CurrentVisibilityState, Characteristic.CurrentVisibilityState.HIDDEN);
+        .setCharacteristic(Characteristic.CurrentVisibilityState, Characteristic.CurrentVisibilityState.SHOWN);
 
       inputService
         .getCharacteristic(Characteristic.ConfiguredName)
         .on('set', (value, callback) => {
-          callback(null, value);
+          callback();
         });
 
       this.tvService.addLinkedService(inputService);
-      this.inputServices.push(inputService);
       this.enabledServices.push(inputService);
-    }
+    });
   },
 
   /* State Handlers */
@@ -151,9 +177,6 @@ YamahaAVRAccessory.prototype = {
   },
 
   updateAVRState(error, status) {
-    this.setConfig();
-    this.setInputs();
-
     if (this.tvService) {
       this.tvService.getCharacteristic(Characteristic.Active).updateValue(status);
 
@@ -163,7 +186,7 @@ YamahaAVRAccessory.prototype = {
             if (input.id === basicInfo.getCurrentInput()) {
               // Get and update homekit accessory with the current set input
               if (this.tvService.getCharacteristic(Characteristic.ActiveIdentifier).value !== index) {
-                this.log(`Updating input from ${input.name} to ${input.name}`);
+                this.log('Updating input', input.name, input.id);
                 return this.tvService.getCharacteristic(Characteristic.ActiveIdentifier).updateValue(index);
               }
             }
@@ -172,75 +195,6 @@ YamahaAVRAccessory.prototype = {
           });
         });
       }
-    }
-  },
-
-  setConfig() {
-    this.YAMAHA.getSystemConfig().then(
-      sysConfig => {
-        if (sysConfig) {
-          this.sysConfig = sysConfig;
-          this.informationService.getCharacteristic(Characteristic.Model).updateValue(this.sysConfig.YAMAHA_AV.System[0].Config[0].Model_Name[0]);
-          this.informationService.getCharacteristic(Characteristic.SerialNumber).updateValue(this.sysConfig.YAMAHA_AV.System[0].Config[0].System_ID[0]);
-        }
-      },
-      error => {
-        this.log(`Failed to get system config from ${this.config.name}. Please verify the AVR is connected and accessible at ${this.config.ip}`);
-      }
-    );
-  },
-
-  setInputs() {
-    // If no inputs defined in config - set available inputs as returned from receiver
-    if (this.sysConfig) {
-      this.YAMAHA.getAvailableInputsWithNames().then(
-        availableInputs => {
-          const sanitizedInputs = [];
-
-          let i = 0;
-
-          for (const key in availableInputs[0]) {
-            // check if the property/key is defined in the object itself, not in parent
-            if (availableInputs[0].hasOwnProperty(key)) {
-              const id = String(key).replace('_', '');
-              const input = {
-                id: id,
-                name: availableInputs[0][key][0],
-                index: i
-              };
-              sanitizedInputs.push(input);
-              i++;
-            }
-          }
-
-          this.inputs = sanitizedInputs;
-
-          if (this.config.inputs && this.config.inputs.length > 0) {
-            const filteredInputs = [];
-
-            this.inputs.forEach((input, i) => {
-              sanitizedInputs.forEach(sanitizedInput => {
-                if (sanitizedInput.id === input.id) {
-                  input.index = i;
-                  filteredInputs.push(input);
-                }
-              });
-            });
-
-            this.inputs = filteredInputs;
-          }
-
-          this.inputs.forEach((input, i) => {
-            const inputService = this.inputServices[i];
-            inputService.getCharacteristic(Characteristic.ConfiguredName).updateValue(input.name);
-            inputService.getCharacteristic(Characteristic.IsConfigured).updateValue(Characteristic.IsConfigured.CONFIGURED);
-            inputService.getCharacteristic(Characteristic.CurrentVisibilityState).updateValue(Characteristic.CurrentVisibilityState.SHOWN);
-          });
-        },
-        error => {
-          this.log(`Failed to get available inputs from ${this.config.name}. Please verify the AVR is connected and accessible at ${this.config.ip}`);
-        }
-      );
     }
   },
 
