@@ -6,7 +6,7 @@
   "dependencies": {
     "ip": "^=1.1.5",
     "node-fetch": "^2.3.0",
-    "yamaha-nodejs": ">=0.9.0"
+    "yamaha-nodejs": ">=0.9.5"
   },
   "devDependencies": {
     "babel-eslint": "^10.0.1",
