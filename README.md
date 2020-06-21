@@ -17,6 +17,9 @@ npm install -g homebridge-yamaha-avr
 ## Usage Notes
 Quickly switch input using the information (i) button in the Control Centre remote
 
+## Important Information
+If you set inputs in the config and one input is missing, that currently is set as input on your AVR, all homekit accessoires are become "not resopondig". Be sure that you set all inputs that you use.
+
 ## Configuration
 Add a new platform to your homebridge `config.json`.
 
@@ -55,6 +58,14 @@ Example configuration:
           {
             "id": "HDMI5",
             "name": "PlayStation 4"
+          },
+          {
+            "id": "Spotify",
+            "name": "Spotify"
+          },
+          {
+            "id": "AirPlay",
+            "name": "AirPlay"
           }
         ]
       }
