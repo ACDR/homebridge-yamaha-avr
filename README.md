@@ -18,7 +18,7 @@ npm install -g homebridge-yamaha-avr
 Quickly switch input using the information (i) button in the Control Centre remote
 
 ## Important Information
-If you set inputs in the config and one input is missing, that currently is set as input on your AVR, all homekit accessoires are become "not resopondig". Be sure that you set all inputs that you use.
+If you set inputs in the config and one input is missing, that currently is set as input on your AVR, all homekit accessories stop responding. Be sure that you set all inputs that you use.
 
 ## Configuration
 Add a new platform to your homebridge `config.json`.
