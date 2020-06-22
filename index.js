@@ -1,5 +1,11 @@
 const YamahaAPI = require('yamaha-nodejs');
 const fetch = require('node-fetch');
+
+// Only need as long the pull request of yamaha-nodejs is accepted see:
+// https://github.com/PSeitz/yamaha-nodejs/pull/34
+var simpleCommandsAddition = require('./simpleCommands_addition');
+// END
+
 // https://github.com/christianfl/av-receiver-docs/
 
 let Service;
@@ -11,8 +17,21 @@ function YamahaAVRPlatform(log, config) {
   this.config = config;
 
   // create the Yamaha API instance
-  this.YAMAHA = new YamahaAPI(config.ip);
+  this.YAMAHA = new YamahaAPI(config.ip);  
 }
+
+
+// Only need as long the pull request of yamaha-nodejs is accepted see:
+// https://github.com/PSeitz/yamaha-nodejs/pull/34
+extend(YamahaAPI.prototype, simpleCommandsAddition.prototype);
+function extend(destination , source) {
+  for (var k in source) {
+      destination[k] = source[k];
+  }
+}
+// END
+
+
 
 /* Initialise Yamaha AVR Accessory */
 function YamahaAVRAccessory(log, config, yamaha) {
@@ -192,11 +211,31 @@ YamahaAVRAccessory.prototype = {
 
   setInputs() {
     if (this.sysConfig) {
+
+      // read features of AVR (Spotify, Airplay etc.) that are available from the device
+      this.YAMAHA.getAvailableFeatures().then(
+        availableInputs => {
+          const sanitizedInputs = [];
+          for (let i in availableInputs) {
+              const id = String(availableInputs[i]).replace('_', '');
+              const input = {
+                id: id,
+                name: availableInputs[i],
+                index: i
+              };
+              sanitizedInputs.push(input);
+            
+          }
+          this.inputs = sanitizedInputs
+        });
+
+      // after features, no get the traditional inputs
       this.YAMAHA.getAvailableInputsWithNames().then(
         availableInputs => {
           const sanitizedInputs = [];
 
-          let i = 0;
+          // use index from the array that is filled by features
+          let i = this.inputs.length;
 
           for (const key in availableInputs[0]) {
             // check if the property/key is defined in the object itself, not in parent
@@ -207,18 +246,26 @@ YamahaAVRAccessory.prototype = {
                 name: availableInputs[0][key][0],
                 index: i
               };
-              sanitizedInputs.push(input);
+
+              // search duplicates, because function and inputs are overlapping (e.g. bluetooth, usb)
+              const foundDuplicate = this.inputs.find(input => input.id === id);
+              if (!foundDuplicate){
+                // add input only if it is not already in inputs
+                sanitizedInputs.push(input);
+              }
+
               i++;
             }
           }
 
-          this.inputs = sanitizedInputs;
+          //merge functions and inputs
+          this.inputs = this.inputs.concat(sanitizedInputs);
 
           if (this.config.inputs && this.config.inputs.length > 0) {
             const filteredInputs = [];
 
             this.config.inputs.forEach((input, i) => {
-              sanitizedInputs.forEach(sanitizedInput => {
+              this.inputs.forEach(sanitizedInput => {
                 if (sanitizedInput.id === input.id) {
                   input.index = i;
                   filteredInputs.push(input);
