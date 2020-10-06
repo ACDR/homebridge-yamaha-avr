@@ -9,7 +9,7 @@
 
 `homebridge-yamaha-avr` is a Homebridge plugin allowing you to control your AVR & any connected HDMI-CEC controllable devices with the Apple Home app & Control Centre remote! It should work with all network accessible receivers.
 
-The Yamaha AVR will display as a TV Accessory with Power, Input, Volume & Remote Control.
+The Yamaha AVR will display as an Audio Receiver with Power, Input, Volume & Remote Control.
 
 ## Requirements
 * iOS 12.2 (or later)
@@ -23,9 +23,6 @@ npm install -g homebridge-yamaha-avr
 
 ## Usage Notes
 Quickly switch input using the information (i) button in the Control Centre remote
-
-## Important Information
-If you set inputs in the config and one input is missing, that currently is set as input on your AVR, all homekit accessories stop responding. Be sure that you set all inputs that you use.
 
 ## Configuration
 Add a new platform to your homebridge `config.json`.
