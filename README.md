@@ -91,7 +91,7 @@ For multi-zone Yamaha Receivers, and uses a Fan to control each zone of the rece
 
 ## Build Plugin
 
-TypeScript needs to be compiled into JavaScript before it can run. The following command will compile the contents of your [`src`](./src) directory and put the resulting code into the `dist` folder.
+TypeScript needs to be compiled into JavaScript before it can run. The following command will compile the contents of the [`src`](./src) directory and put the resulting code into the `dist` folder.
 
 ```
 npm run build
@@ -105,7 +105,7 @@ Run this command so your global install of Homebridge can discover the plugin in
 npm link
 ```
 
-You can now start Homebridge, use the `-D` flag so you can see debug log messages in your plugin:
+You can now start Homebridge, use the `-D` flag so you can see debug log messages:
 
 ```
 homebridge -D

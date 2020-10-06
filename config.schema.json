@@ -1,5 +1,5 @@
 {
-  "pluginAlias": "YamahaAVR",
+  "pluginAlias": "yamaha-avr",
   "pluginType": "platform",
   "singular": true,
   "schema": {
