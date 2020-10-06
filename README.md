@@ -22,7 +22,8 @@ npm install -g homebridge-yamaha-avr
 ```
 
 ## Usage Notes
-Quickly switch input using the information (i) button in the Control Centre remote
+* Quickly switch input using the information (i) button in the Control Centre remote
+* Adjust the volume using the physical volume buttons on your iOS device whilst the Control Centre remote is open
 
 ## Configuration
 Add a new platform to your homebridge `config.json`.
