@@ -12,8 +12,8 @@
 The Yamaha AVR will display as an Audio Receiver with Power, Input, Volume & Remote Control.
 
 ## Requirements
-* iOS 12.2 (or later)
-* [Homebridge](https://homebridge.io/) v0.4.46 (or later)
+* iOS 14 (or later)
+* [Homebridge](https://homebridge.io/) v1.1.6 (or later)
 
 ## Installation
 Install homebridge-yamaha-avr:
