@@ -80,7 +80,8 @@ export class YamahaAVRPlatform implements IndependentPlatformPlugin {
 
           this.api.publishExternalAccessories(PLUGIN_NAME, [accessory]);
         },
-      ).catch(() => {
+      )
+      .catch(() => {
         this.log.error(`
           Failed to get system config from ${this.config.name}. Please verify the AVR is connected and accessible at ${this.config.ip}
         `);
