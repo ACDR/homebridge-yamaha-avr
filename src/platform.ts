@@ -1,17 +1,14 @@
-import { API, IndependentPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, Service, Characteristic } from 'homebridge';
+import { API, IndependentPlatformPlugin, Logger, PlatformConfig, Service, Characteristic } from 'homebridge';
 import Yamaha from 'yamaha-nodejs';
 
 import { YamahaAPI } from './types';
 import { PLUGIN_NAME } from './settings';
-import { YamahaAVRAccessory } from './platformAccessory';
+import { YamahaAVRAccessory } from './accessory';
 
 export class YamahaAVRPlatform implements IndependentPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
   public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
   public readonly YamahaAVR: YamahaAPI = new Yamaha(this.config.ip);
-
-  // this is used to track restored cached accessories
-  public readonly accessories: PlatformAccessory[] = [];
 
   constructor(
     public readonly log: Logger,
@@ -26,14 +23,6 @@ export class YamahaAVRPlatform implements IndependentPlatformPlugin {
     });
   }
 
-  // This function is invoked when homebridge restores cached accessories from disk at startup.
-  configureAccessory(accessory: PlatformAccessory) {
-    this.log.info('Loading accessory from cache:', accessory.displayName);
-
-    // add the restored accessory to the accessories cache so we can track if it has already been registered
-    this.accessories.push(accessory);
-  }
-
   discoverAVR() {
     this.YamahaAVR.getSystemConfig()
       .then(
@@ -44,26 +33,12 @@ export class YamahaAVRPlatform implements IndependentPlatformPlugin {
             firmwareVersion: systemConfig.YAMAHA_AV.System[0].Config[0].Version[0],
           };
 
+          const features = systemConfig.YAMAHA_AV.System[0].Config[0].Feature_Existence[0];
+
           const device = {
-            // generate a unique id for the accessory using the system id & model name
-            UUID: this.api.hap.uuid.generate(
-              `${config.systemId}_${config.modelName}_1`,
-            ),
+            UUID: this.api.hap.uuid.generate(`${config.systemId}_2`),
             displayName: `Yamaha ${this.config.name}`,
           };
-
-          // see if an accessory with the same uuid has already been registered and restored from
-          // the cached devices we stored in the `configureAccessory` method above
-          const existingAccessory = this.accessories.find(accessory => accessory.UUID === device.UUID);
-
-          if (existingAccessory) {
-            this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
-            new YamahaAVRAccessory(this, existingAccessory);
-            return;
-          }
-
-          // the accessory does not yet exist, so we need to create it
-          this.log.info('Adding new accessory:', device.displayName);
 
           const accessory = new this.api.platformAccessory(
             device.displayName,
@@ -73,6 +48,7 @@ export class YamahaAVRPlatform implements IndependentPlatformPlugin {
 
           accessory.context = {
             ...config,
+            features,
             device,
           };
 

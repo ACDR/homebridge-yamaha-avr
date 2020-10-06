@@ -15,6 +15,7 @@ interface ConfigInput {
 
 export class YamahaAVRAccessory {
   private service: Service;
+  private inputServices: Service[] = [];
 
   private state = {
     isPlaying: true as boolean,
@@ -33,13 +34,11 @@ export class YamahaAVRAccessory {
       .setCharacteristic(this.platform.Characteristic.SerialNumber, this.accessory.context.systemId || 'Unknown')
       .setCharacteristic(this.platform.Characteristic.FirmwareRevision, this.accessory.context.firmwareVersion || 'Unknown');
 
-    // get the Television service if it exists, otherwise create a new Television service
-    this.service = this.accessory.getService(this.platform.Service.Television) ||
-      this.accessory.addService(this.platform.Service.Television);
+    this.service = this.accessory.addService(this.platform.Service.Television);
 
     this.createTVService();
     this.createTVSpeakerService();
-    this.createInputSources();
+    this.createInputSourceServices();
 
     // regularly ping the AVR to keep power/input state syncronised
     setInterval(
@@ -167,8 +166,7 @@ export class YamahaAVRAccessory {
   }
 
   createTVSpeakerService() {
-    const speakerService = this.accessory.getService(this.platform.Service.TelevisionSpeaker) ||
-      this.accessory.addService(this.platform.Service.TelevisionSpeaker);
+    const speakerService = this.accessory.addService(this.platform.Service.TelevisionSpeaker);
 
     speakerService
       .setCharacteristic(this.platform.Characteristic.Active, this.platform.Characteristic.Active.ACTIVE)
@@ -181,17 +179,70 @@ export class YamahaAVRAccessory {
       });
   }
 
-  createInputSources() {
+  createInputSourceServices() {
+    for (let i = 0; i < 30; i++) {
+      const inputName = `Input ${i < 9 ? `0${i + 1}` : i + 1}`;
+      const inputService = this.accessory.addService(this.platform.Service.InputSource, inputName, `input_${i}`);
+
+      inputService
+        .setCharacteristic(this.platform.Characteristic.Identifier, i)
+        .setCharacteristic(this.platform.Characteristic.Name, inputName)
+        .setCharacteristic(this.platform.Characteristic.ConfiguredName, inputName)
+        .setCharacteristic(
+          this.platform.Characteristic.IsConfigured,
+          this.platform.Characteristic.IsConfigured.NOT_CONFIGURED,
+        )
+        .setCharacteristic(
+          this.platform.Characteristic.CurrentVisibilityState,
+          this.platform.Characteristic.CurrentVisibilityState.HIDDEN,
+        )
+        .setCharacteristic(
+          this.platform.Characteristic.InputSourceType,
+          this.platform.Characteristic.InputSourceType.APPLICATION,
+        );
+
+      inputService
+        .getCharacteristic(this.platform.Characteristic.ConfiguredName)
+        .on('set', (value, callback) => {
+          callback(null, value);
+        });
+
+      this.service.addLinkedService(inputService);
+      this.inputServices.push(inputService);
+    }
+  }
+
+  updateInputSources() {
+    const featuresXML = this.accessory.context.features;
+    const features: string[] = [];
+
+    for (const prop in featuresXML) {
+      if (
+        !prop.includes('Zone') &&
+        featuresXML[prop].includes('1') &&
+        !prop.includes('USB') &&
+        !prop.includes('Tuner')
+      ) {
+        features.push(prop);
+      }
+    }
+
     this.platform.YamahaAVR.getAvailableInputsWithNames()
       .then(availableInputs => {
-        const sanitizedInputs: Input[] = [];
+        this.state.inputs = [];
+
+        features.forEach((feature, i) => {
+          this.state.inputs.push({
+            id: feature.replace('_', ' '),
+            name: feature.replace('_', ' '),
+            index: i,
+          });
+        });
 
         // use index from the array that is filled by features
         let i = this.state.inputs.length;
 
         for (const key in availableInputs[0]) {
-          // this.platform.log.info(availableInputs[0][key][0]);
-
           // check if the property/key is defined in the object itself, not in parent
           if (availableInputs[0].hasOwnProperty(key)) { // eslint-disable-line
             const id = String(key).replace('_', '');
@@ -199,26 +250,24 @@ export class YamahaAVRAccessory {
             const input: Input = {
               id,
               name: availableInputs[0][key][0],
-              index: Number(i),
+              index: i,
             };
 
             if (!this.state.inputs.find(input => input.id === id)) {
               // add input only if it is not already in inputs
-              sanitizedInputs.push(input);
+              this.state.inputs.push(input);
             }
 
             i++;
           }
         }
 
-        this.state.inputs = this.state.inputs.concat(sanitizedInputs);
-
         const configInputs = this.platform.config.inputs as ConfigInput[];
 
         if (configInputs && configInputs.length > 0) {
           const filteredInputs: Input[] = [];
 
-          configInputs.forEach(configInput => {
+          configInputs.forEach((configInput, i) => {
             if (this.state.inputs.find(input => input.id === configInput.id)) {
               filteredInputs.push({
                 ...configInput,
@@ -231,26 +280,14 @@ export class YamahaAVRAccessory {
         }
 
         this.state.inputs.forEach((input, i) => {
-          const inputService = this.accessory.addService(this.platform.Service.InputSource, input.name, `input_${i}`);
+          const inputService = this.inputServices[i];
 
-          inputService
-            .setCharacteristic(this.platform.Characteristic.Identifier, i)
-            .setCharacteristic(this.platform.Characteristic.Name, input.name)
-            .setCharacteristic(this.platform.Characteristic.ConfiguredName, input.name)
-            .setCharacteristic(
-              this.platform.Characteristic.IsConfigured,
-              this.platform.Characteristic.IsConfigured.CONFIGURED,
-            )
-            .setCharacteristic(
-              this.platform.Characteristic.CurrentVisibilityState,
-              this.platform.Characteristic.CurrentVisibilityState.SHOWN,
-            )
-            .setCharacteristic(
-              this.platform.Characteristic.InputSourceType,
-              this.platform.Characteristic.InputSourceType.HDMI,
-            );
-
-          this.service.addLinkedService(inputService);
+          inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName)
+            .updateValue(input.name);
+          inputService.getCharacteristic(this.platform.Characteristic.IsConfigured)
+            .updateValue(this.platform.Characteristic.IsConfigured.CONFIGURED);
+          inputService.getCharacteristic(this.platform.Characteristic.CurrentVisibilityState)
+            .updateValue(this.platform.Characteristic.CurrentVisibilityState.SHOWN);
         });
       })
       .catch(() => {
@@ -262,40 +299,40 @@ export class YamahaAVRAccessory {
   }
 
   updateAVRState(error, status) {
-    if (this.service) {
-      this.service.getCharacteristic(this.platform.Characteristic.Active).updateValue(status);
+    this.service.getCharacteristic(this.platform.Characteristic.Active).updateValue(status);
 
-      this.platform.YamahaAVR.getBasicInfo()
-        .then((basicInfo) => {
-          this.state.inputs.filter((input, index) => {
-            if (input.id === basicInfo.getCurrentInput()) {
-              // Get and update homekit accessory with the current set input
-              if (this.service.getCharacteristic(this.platform.Characteristic.ActiveIdentifier).value !== index) {
-                this.platform.log.info(`Updating input from ${input.name} to ${input.name}`);
-                return this.service.getCharacteristic(this.platform.Characteristic.ActiveIdentifier).updateValue(index);
-              }
+    this.platform.YamahaAVR.getBasicInfo()
+      .then((basicInfo) => {
+        this.updateInputSources();
+
+        this.state.inputs.filter((input, index) => {
+          if (input.id === basicInfo.getCurrentInput()) {
+            // Get and update homekit accessory with the current set input
+            if (this.service.getCharacteristic(this.platform.Characteristic.ActiveIdentifier).value !== index) {
+              this.platform.log.info(`Updating input from ${input.name} to ${input.name}`);
+              return this.service.getCharacteristic(this.platform.Characteristic.ActiveIdentifier).updateValue(index);
             }
-
-            if (this.state.connectionError) {
-              this.state.connectionError = false;
-              this.platform.log.info(`Communication with Yamaha AVR at ${this.platform.config.ip} restored`);
-            }
-
-            return;
-          });
-        })
-        .catch(() => {
-          if (this.state.connectionError) {
-            return;
           }
 
-          this.state.connectionError = true;
-          this.platform.log.error(`
-            Cannot communicate with Yamaha AVR at ${this.platform.config.ip}.
-            Connection will be restored automatically when the AVR begins responding.
-          `);
+          if (this.state.connectionError) {
+            this.state.connectionError = false;
+            this.platform.log.info(`Communication with Yamaha AVR at ${this.platform.config.ip} restored`);
+          }
+
+          return;
         });
-    }
+      })
+      .catch(() => {
+        if (this.state.connectionError) {
+          return;
+        }
+
+        this.state.connectionError = true;
+        this.platform.log.error(`
+          Cannot communicate with Yamaha AVR at ${this.platform.config.ip}.
+          Connection will be restored automatically when the AVR begins responding.
+        `);
+      });
   }
 
   getPowerState(callback: CharacteristicGetCallback) {
@@ -343,9 +380,10 @@ export class YamahaAVRAccessory {
   getInputState(callback: CharacteristicGetCallback) {
     this.platform.YamahaAVR.getBasicInfo()
       .then(basicInfo => {
+        this.platform.log.info(`Current Input: ${basicInfo.getCurrentInput()}`);
+
         this.state.inputs.filter((input, index) => {
           if (input.id === basicInfo.getCurrentInput()) {
-            this.platform.log.info(`Current Input: ${input.name}`, index);
             return callback(null, index);
           }
 
