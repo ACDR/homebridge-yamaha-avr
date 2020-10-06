@@ -245,7 +245,11 @@ export class YamahaAVRAccessory {
         for (const key in availableInputs[0]) {
           // check if the property/key is defined in the object itself, not in parent
           if (availableInputs[0].hasOwnProperty(key)) { // eslint-disable-line
-            const id = String(key).replace('_', '');
+            let id = String(key).replace('_', '');
+
+            if (key.includes('MusicCast_Link') || key.includes('NET_RADIO')) {
+              id = String(key).replace('_', ' ');
+            }
 
             const input: Input = {
               id,
