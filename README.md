@@ -87,7 +87,7 @@ For multi-zone Yamaha Receivers, and uses a Fan to control each zone of the rece
 
 
 
-# Development
+# Contributing
 
 ## Build Plugin
 
