@@ -5,58 +5,91 @@
 
 </p>
 
+# homebridge-yamaha-avr
 
-# Homebridge Platform Plugin Template
+`homebridge-yamaha-avr` is a Homebridge plugin allowing you to control your AVR & any connected HDMI-CEC controllable devices with the Apple Home app & Control Centre remote! It should work with all network accessible receivers.
 
-This is a template Homebridge platform plugin and can be used as a base to help you get started developing your own plugin.
+The Yamaha AVR will display as a TV Accessory with Power, Input, Volume & Remote Control.
 
-This template should be use in conjunction with the [developer documentation](https://developers.homebridge.io/). A full list of all supported service types, and their characteristics is available on this site.
+## Requirements
+* iOS 12.2 (or later)
+* [Homebridge](https://homebridge.io/) v0.4.46 (or later)
 
-## Clone As Template
-
-Click the link below to create a new GitHub Repository using this template, or click the *Use This Template* button above.
-
-<span align="center">
-
-### [Create New Repository From Template](https://github.com/homebridge/homebridge-plugin-template/generate)
-
-</span>
-
-## Setup Development Environment
-
-To develop Homebridge plugins you must have Node.js 12 or later installed, and a modern code editor such as [VS Code](https://code.visualstudio.com/). This plugin template uses [TypeScript](https://www.typescriptlang.org/) to make development easier and comes with pre-configured settings for [VS Code](https://code.visualstudio.com/) and ESLint. If you are using VS Code install these extensions:
-
-* [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint)
-
-## Install Development Dependencies
-
-Using a terminal, navigate to the project folder and run this command to install the development dependencies:
-
-```
-npm install
+## Installation
+Install homebridge-yamaha-avr:
+```sh
+npm install -g homebridge-yamaha-avr
 ```
 
-## Update package.json
+## Usage Notes
+Quickly switch input using the information (i) button in the Control Centre remote
 
-Open the [`package.json`](./package.json) and change the following attributes:
+## Important Information
+If you set inputs in the config and one input is missing, that currently is set as input on your AVR, all homekit accessories stop responding. Be sure that you set all inputs that you use.
 
-* `name` - this should be prefixed with `homebridge-` or `@username/homebridge-` and contain no spaces or special characters apart from a dashes
-* `displayName` - this is the "nice" name displayed in the Homebridge UI
-* `repository.url` - Link to your GitHub repo
-* `bugs.url` - Link to your GitHub repo issues page
+## Configuration
+Add a new platform to your homebridge `config.json`.
 
-When you are ready to publish the plugin you should set `private` to false, or remove the attribute entirely.
+Specific "favourite" inputs can be added manually or all available inputs reported by the AVR will be set.
 
-## Update Plugin Defaults
+Example configuration:
 
-Open the [`src/settings.ts`](./src/settings.ts) file and change the default values:
+```js
+{
+    "platforms": [
+      {
+        "platform": "yamaha-avr",
+        "name": "Yamaha RX-V685",
+        "ip": "192.168.1.12",
+        "inputs": [
+          {
+            "id": "AV1",
+            "name": "LG TV"
+          },
+          {
+            "id": "HDMI1",
+            "name": "NVIDIA SHIELD"
+          },
+          {
+            "id": "HDMI2",
+            "name": "Apple TV"
+          },
+          {
+            "id": "HDMI3",
+            "name": "PC"
+          },
+          {
+            "id": "HDMI4",
+            "name": "Xbox One"
+          },
+          {
+            "id": "HDMI5",
+            "name": "PlayStation 4"
+          },
+          {
+            "id": "Spotify",
+            "name": "Spotify"
+          },
+          {
+            "id": "AirPlay",
+            "name": "AirPlay"
+          }
+        ]
+      }
+    ]
+  }
+```
 
-* `PLATFORM_NAME` - Set this to be the name of your platform. This is the name of the platform that users will use to register the plugin in the Homebridge `config.json`.
-* `PLUGIN_NAME` - Set this to be the same name you set in the [`package.json`](./package.json) file. 
+## Other Yamaha Receiver Plugins
+[homebridge-yamaha-zone-tv](https://github.com/NorthernMan54/homebridge-yamaha-zone-tv)
+For multi-zone Yamaha Receivers, and uses the Television control for each zone of the receiver.
 
-Open the [`config.schema.json`](./config.schema.json) file and change the following attribute:
+[homebridge-yamaha-home](https://github.com/NorthernMan54/homebridge-yamaha-home)
+For multi-zone Yamaha Receivers, and uses a Fan to control each zone of the receiver.
 
-* `pluginAlias` - set this to match the `PLATFORM_NAME` you defined in the previous step.
+
+
+# Development
 
 ## Build Plugin
 
@@ -89,62 +122,5 @@ npm run watch
 ```
 
 This will launch an instance of Homebridge in debug mode which will restart every time you make a change to the source code. It will load the config stored in the default location under `~/.homebridge`. You may need to stop other running instances of Homebridge while using this command to prevent conflicts. You can adjust the Homebridge startup command in the [`nodemon.json`](./nodemon.json) file.
-
-## Customise Plugin
-
-You can now start customising the plugin template to suit your requirements.
-
-* [`src/platform.ts`](./src/platform.ts) - this is where your device setup and discovery should go.
-* [`src/platformAccessory.ts`](./src/platformAccessory.ts) - this is where your accessory control logic should go, you can rename or create multiple instances of this file for each accessory type you need to implement as part of your platform plugin. You can refer to the [developer documentation](https://developers.homebridge.io/) to see what characteristics you need to implement for each service type.
-* [`config.schema.json`](./config.schema.json) - update the config schema to match the config you expect from the user. See the [Plugin Config Schema Documentation](https://developers.homebridge.io/#/config-schema).
-
-## Versioning Your Plugin
-
-Given a version number `MAJOR`.`MINOR`.`PATCH`, such as `1.4.3`, increment the:
-
-1. **MAJOR** version when you make breaking changes to your plugin,
-2. **MINOR** version when you add functionality in a backwards compatible manner, and
-3. **PATCH** version when you make backwards compatible bug fixes.
-
-You can use the `npm version` command to help you with this:
-
-```bash
-# major update / breaking changes
-npm version major
-
-# minor update / new features
-npm version update
-
-# patch / bugfixes
-npm version patch
-```
-
-## Publish Package
-
-When you are ready to publish your plugin to [npm](https://www.npmjs.com/), make sure you have removed the `private` attribute from the [`package.json`](./package.json) file then run:
-
-```
-npm publish
-```
-
-If you are publishing a scoped plugin, i.e. `@username/homebridge-xxx` you will need to add `--access=public` to command the first time you publish.
-
-#### Publishing Beta Versions
-
-You can publish *beta* versions of your plugin for other users to test before you release it to everyone.
-
-```bash
-# create a new pre-release version (eg. 2.1.0-beta.1)
-npm version prepatch --preid beta
-
-# publsh to @beta
-npm publish --tag=beta
-```
-
-Users can then install the  *beta* version by appending `@beta` to the install command, for example:
-
-```
-sudo npm install -g homebridge-example-plugin@beta
-```
 
 
