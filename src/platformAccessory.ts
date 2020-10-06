@@ -355,10 +355,9 @@ export class YamahaAVRAccessory {
   }
 
   setInputState(inputIdentifier: CharacteristicValue, callback: CharacteristicSetCallback) {
-    console.log(inputIdentifier);
-    // const input: Input = this.state.inputs[inputIdentifier];
-    // this.platform.log.info(`Set input: ${input.name} (${input.id})`);
-    // this.platform.YamahaAVR.setInputTo(input.id);
+    const input: Input = this.state.inputs[inputIdentifier];
+    this.platform.log.info(`Set input: ${input.name} (${input.id})`);
+    this.platform.YamahaAVR.setInputTo(input.id);
     callback(null);
   }
 }
