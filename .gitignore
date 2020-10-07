@@ -58,6 +58,9 @@ web_modules/
 # Optional eslint cache
 .eslintcache
 
+# node-persist cache
+.node-persist
+
 # Microbundle cache
 .rpt2_cache/
 .rts2_cache_cjs/
