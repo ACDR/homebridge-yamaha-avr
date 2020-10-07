@@ -335,23 +335,6 @@ export class YamahaAVRAccessory {
           }
         }
 
-        if (this.inputServices.length === 0) {
-          return;
-        }
-
-        this.state.inputs.forEach((input, i) => {
-          // const inputService = this.inputServices[i];
-
-          if (input.name) {
-            // console.log(inputService.displayName, inputService.subtype, inputService.name);
-          }
-
-          // inputService.updateCharacteristic(
-          //   this.platform.Characteristic.ConfiguredName,
-          //   input.name,
-          // );
-        });
-
         return;
       })
       .catch(() => {
