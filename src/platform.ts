@@ -2,7 +2,6 @@ import { API, IndependentPlatformPlugin, Logger, PlatformConfig, Service, Charac
 import Yamaha from 'yamaha-nodejs';
 
 import { YamahaAPI } from './types';
-import { PLUGIN_NAME } from './settings';
 import { YamahaAVRAccessory } from './accessory';
 
 export class YamahaAVRPlatform implements IndependentPlatformPlugin {
@@ -36,7 +35,7 @@ export class YamahaAVRPlatform implements IndependentPlatformPlugin {
           const features = systemConfig.YAMAHA_AV.System[0].Config[0].Feature_Existence[0];
 
           const device = {
-            UUID: this.api.hap.uuid.generate(`${config.systemId}_2`),
+            UUID: this.api.hap.uuid.generate(`${config.systemId}_3`),
             displayName: `Yamaha ${this.config.name}`,
           };
 
@@ -53,8 +52,6 @@ export class YamahaAVRPlatform implements IndependentPlatformPlugin {
           };
 
           new YamahaAVRAccessory(this, accessory);
-
-          this.api.publishExternalAccessories(PLUGIN_NAME, [accessory]);
         },
       )
       .catch(() => {

@@ -1,16 +1,12 @@
 import { Service, PlatformAccessory, CharacteristicValue, CharacteristicSetCallback, CharacteristicGetCallback } from 'homebridge';
 import fetch from 'node-fetch';
 import { YamahaAVRPlatform } from './platform';
+import { PLUGIN_NAME } from './settings';
 
 interface Input {
   id: string;
   name: string;
   index: number;
-}
-
-interface ConfigInput {
-  id: string;
-  name: string;
 }
 
 export class YamahaAVRAccessory {
@@ -36,9 +32,7 @@ export class YamahaAVRAccessory {
 
     this.service = this.accessory.addService(this.platform.Service.Television);
 
-    this.createTVService();
-    this.createTVSpeakerService();
-    this.createInputSourceServices();
+    this.init();
 
     // regularly ping the AVR to keep power/input state syncronised
     setInterval(
@@ -47,7 +41,16 @@ export class YamahaAVRAccessory {
     );
   }
 
-  createTVService() {
+  async init() {
+    await this.createTVService();
+    await this.createTVSpeakerService();
+    await this.createInputSourceServices();
+
+    // Wait for all services to be created before publishing
+    this.platform.api.publishExternalAccessories(PLUGIN_NAME, [this.accessory]);
+  }
+
+  async createTVService() {
     // Set Television Service Name & Discovery Mode
     this.service
       .setCharacteristic(
@@ -163,9 +166,11 @@ export class YamahaAVRAccessory {
             break;
         }
       });
+
+    return;
   }
 
-  createTVSpeakerService() {
+  async createTVSpeakerService() {
     const speakerService = this.accessory.addService(this.platform.Service.TelevisionSpeaker);
 
     speakerService
@@ -177,42 +182,53 @@ export class YamahaAVRAccessory {
       .on('set', (direction: CharacteristicValue, callback: CharacteristicSetCallback) => {
         this.setVolume(direction, callback);
       });
+
+    return;
   }
 
-  createInputSourceServices() {
-    for (let i = 0; i < 30; i++) {
-      const inputName = `Input ${i < 9 ? `0${i + 1}` : i + 1}`;
-      const inputService = this.accessory.addService(this.platform.Service.InputSource, inputName, `input_${i}`);
+  async createInputSourceServices() {
+    await this.updateInputSources();
+
+    this.state.inputs.forEach((input, i) => {
+      const inputService = this.accessory.addService(
+        this.platform.Service.InputSource,
+        this.platform.api.hap.uuid.generate(input.id),
+        input.name,
+      );
 
       inputService
         .setCharacteristic(this.platform.Characteristic.Identifier, i)
-        .setCharacteristic(this.platform.Characteristic.Name, inputName)
-        .setCharacteristic(this.platform.Characteristic.ConfiguredName, inputName)
-        .setCharacteristic(
-          this.platform.Characteristic.IsConfigured,
-          this.platform.Characteristic.IsConfigured.NOT_CONFIGURED,
-        )
-        .setCharacteristic(
-          this.platform.Characteristic.CurrentVisibilityState,
-          this.platform.Characteristic.CurrentVisibilityState.HIDDEN,
-        )
-        .setCharacteristic(
-          this.platform.Characteristic.InputSourceType,
-          this.platform.Characteristic.InputSourceType.APPLICATION,
-        );
+        .setCharacteristic(this.platform.Characteristic.Name, input.name)
+        .setCharacteristic(this.platform.Characteristic.IsConfigured, this.platform.Characteristic.IsConfigured.CONFIGURED)
+        .setCharacteristic(this.platform.Characteristic.CurrentVisibilityState, this.platform.Characteristic.CurrentVisibilityState.SHOWN)
+        .setCharacteristic(this.platform.Characteristic.InputSourceType, this.platform.Characteristic.InputSourceType.APPLICATION)
+        .setCharacteristic(this.platform.Characteristic.InputDeviceType, this.platform.Characteristic.InputDeviceType.TV);
 
-      inputService
-        .getCharacteristic(this.platform.Characteristic.ConfiguredName)
-        .on('set', (value, callback) => {
-          callback(null, value);
+
+      inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName)
+        .on('set', (name, callback) => {
+          this.platform.log.debug(`Set input (${input.id}) name to ${name}`);
+          inputService.updateCharacteristic(this.platform.Characteristic.ConfiguredName, name);
+          callback(null);
+        })
+        .updateValue(input.name);
+
+      inputService.getCharacteristic(this.platform.Characteristic.TargetVisibilityState)
+        .on('set', (visibility, callback) => {
+          this.platform.log.debug(`setTargetVisibilityState => ${visibility}`);
+          inputService.updateCharacteristic(this.platform.Characteristic.CurrentVisibilityState, visibility);
+          callback(null);
         });
+
+      inputService.getCharacteristic(this.platform.Characteristic.Name)
+        .on('get', callback => callback(null, input.name));
 
       this.service.addLinkedService(inputService);
       this.inputServices.push(inputService);
-    }
+    });
   }
 
-  updateInputSources() {
+  async updateInputSources() {
     const featuresXML = this.accessory.context.features;
     const features: string[] = [];
 
@@ -227,7 +243,7 @@ export class YamahaAVRAccessory {
       }
     }
 
-    this.platform.YamahaAVR.getAvailableInputsWithNames()
+    return this.platform.YamahaAVR.getAvailableInputsWithNames()
       .then(availableInputs => {
         this.state.inputs = [];
 
@@ -266,65 +282,53 @@ export class YamahaAVRAccessory {
           }
         }
 
-        const configInputs = this.platform.config.inputs as ConfigInput[];
-
-        if (configInputs && configInputs.length > 0) {
-          const filteredInputs: Input[] = [];
-
-          configInputs.forEach((configInput, i) => {
-            if (this.state.inputs.find(input => input.id === configInput.id)) {
-              filteredInputs.push({
-                ...configInput,
-                index: i,
-              });
-            }
-          });
-
-          this.state.inputs = filteredInputs;
+        if (this.inputServices.length === 0) {
+          return;
         }
 
         this.state.inputs.forEach((input, i) => {
-          const inputService = this.inputServices[i];
+          // const inputService = this.inputServices[i];
 
-          inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName)
-            .updateValue(input.name);
-          inputService.getCharacteristic(this.platform.Characteristic.IsConfigured)
-            .updateValue(this.platform.Characteristic.IsConfigured.CONFIGURED);
-          inputService.getCharacteristic(this.platform.Characteristic.CurrentVisibilityState)
-            .updateValue(this.platform.Characteristic.CurrentVisibilityState.SHOWN);
+          if (input.name) {
+            // console.log(inputService.displayName, inputService.subtype, inputService.name);
+          }
+
+          // inputService.updateCharacteristic(
+          //   this.platform.Characteristic.ConfiguredName,
+          //   input.name,
+          // );
         });
+
+        return;
       })
       .catch(() => {
         this.platform.log.error(`
           Failed to get available inputs from ${this.platform.config.name}.
           Please verify the AVR is connected and accessible at ${this.platform.config.ip}
         `);
+
+        return;
       });
   }
 
   updateAVRState(error, status) {
-    this.service.getCharacteristic(this.platform.Characteristic.Active).updateValue(status);
+    this.service.updateCharacteristic(this.platform.Characteristic.Active, status);
 
     this.platform.YamahaAVR.getBasicInfo()
-      .then((basicInfo) => {
-        this.updateInputSources();
+      .then(async (basicInfo) => {
+        await this.updateInputSources();
 
-        this.state.inputs.filter((input, index) => {
-          if (input.id === basicInfo.getCurrentInput()) {
-            // Get and update homekit accessory with the current set input
-            if (this.service.getCharacteristic(this.platform.Characteristic.ActiveIdentifier).value !== index) {
-              this.platform.log.info(`Updating input from ${input.name} to ${input.name}`);
-              return this.service.getCharacteristic(this.platform.Characteristic.ActiveIdentifier).updateValue(index);
-            }
-          }
+        this.service.updateCharacteristic(
+          this.platform.Characteristic.ActiveIdentifier,
+          this.state.inputs.findIndex(input => input.id === basicInfo.getCurrentInput()),
+        );
 
-          if (this.state.connectionError) {
-            this.state.connectionError = false;
-            this.platform.log.info(`Communication with Yamaha AVR at ${this.platform.config.ip} restored`);
-          }
+        if (this.state.connectionError) {
+          this.state.connectionError = false;
+          this.platform.log.info(`Communication with Yamaha AVR at ${this.platform.config.ip} restored`);
+        }
 
-          return;
-        });
+        return;
       })
       .catch(() => {
         if (this.state.connectionError) {
@@ -384,7 +388,15 @@ export class YamahaAVRAccessory {
   getInputState(callback: CharacteristicGetCallback) {
     this.platform.YamahaAVR.getBasicInfo()
       .then(basicInfo => {
-        this.platform.log.info(`Current Input: ${basicInfo.getCurrentInput()}`);
+        const input: Input | undefined = this.state.inputs.find(input => input.id === basicInfo.getCurrentInput());
+
+        this.platform.log.debug(`Current input: ${basicInfo.getCurrentInput()}`);
+
+        if (!input) {
+          return;
+        }
+
+        this.platform.log.info(`Current input: ${input.name} (${input.id})`);
 
         this.state.inputs.filter((input, index) => {
           if (input.id === basicInfo.getCurrentInput()) {
