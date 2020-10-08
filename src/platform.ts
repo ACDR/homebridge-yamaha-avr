@@ -36,7 +36,7 @@ export class YamahaAVRPlatform implements IndependentPlatformPlugin {
 
           const device = {
             UUID: this.api.hap.uuid.generate(`${config.systemId}_3`),
-            displayName: `Yamaha ${this.config.name}`,
+            displayName: this.config.name ? this.config.name : 'Yamaha AVR',
           };
 
           const accessory = new this.api.platformAccessory(
