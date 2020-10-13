@@ -13,9 +13,9 @@
       },
       "inputs": {
         "title": "Name",
-        "type": "object",
+        "type": "string",
         "required": false,
-        "default": ""
+        "default": "Yamaha AVR"
       }
     }
   }
