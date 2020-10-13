@@ -49,7 +49,7 @@ Select "Add Accessory" in the Home app, then "I Don't Have a Code or Cannot Scan
 
 The AVR should then show as an option, enter your Homebridge PIN and you should be good to go.
 
-<img src="https://user-images.githubusercontent.com/1072488/95639584-78824280-0af5-11eb-94cf-c6a8dd9793f4.png" />
+<img src="https://user-images.githubusercontent.com/1072488/95639584-78824280-0af5-11eb-94cf-c6a8dd9793f4.png" width="320" />
 
 ## Notes
 You can define the ports external accessories are assigned by setting a range in your Homebridge config:
