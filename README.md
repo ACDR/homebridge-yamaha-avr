@@ -43,6 +43,14 @@ Example configuration:
   }
 ```
 
+The AVR is published as an external accessory so you'll need to add it manually.
+
+Select "Add Accessory" in the Home app, then "I Don't Have a Code or Cannot Scan".
+
+The AVR should then show as an option, enter your Homebridge PIN and you should be good to go.
+
+<img src="https://user-images.githubusercontent.com/1072488/95639584-78824280-0af5-11eb-94cf-c6a8dd9793f4.png" />
+
 ## Notes
 You can define the ports external accessories are assigned by setting a range in your Homebridge config:
 https://github.com/homebridge/homebridge/blob/master/config-sample.json#L12
