@@ -43,6 +43,10 @@ Example configuration:
   }
 ```
 
+## Notes
+You can define the ports external accessories are assigned by setting a range in your Homebridge config:
+https://github.com/homebridge/homebridge/blob/master/config-sample.json#L12
+
 ## Other Yamaha Receiver Plugins
 #### [homebridge-yamaha-zone-tv](https://github.com/NorthernMan54/homebridge-yamaha-zone-tv)
 For multi-zone Yamaha Receivers, and uses the Television control for each zone of the receiver.
