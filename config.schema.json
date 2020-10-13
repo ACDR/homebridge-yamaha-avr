@@ -1,0 +1,22 @@
+{
+  "pluginAlias": "yamaha-avr",
+  "pluginType": "platform",
+  "singular": true,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "ip": {
+        "title": "IP Address",
+        "type": "string",
+        "required": true,
+        "default": ""
+      },
+      "inputs": {
+        "title": "Name",
+        "type": "string",
+        "required": false,
+        "default": "Yamaha AVR"
+      }
+    }
+  }
+}

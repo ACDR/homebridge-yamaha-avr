@@ -1,7 +1,22 @@
-# Ignore compiled code
-dist
+# Ignore source code
+src
 
 # ------------- Defaults ------------- #
+
+# gitHub actions
+.github
+
+# eslint
+.eslintrc
+
+# typescript
+tsconfig.json
+
+# vscode
+.vscode
+
+# nodemon
+nodemon.json
 
 # Logs
 logs
@@ -58,9 +73,6 @@ web_modules/
 # Optional eslint cache
 .eslintcache
 
-# node-persist cache
-.node-persist
-
 # Microbundle cache
 .rpt2_cache/
 .rts2_cache_cjs/
@@ -114,7 +126,6 @@ dist
 
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
-.vscode
 
 # yarn v2
 
