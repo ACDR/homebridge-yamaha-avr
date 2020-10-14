@@ -49,13 +49,20 @@ export class YamahaAVRAccessory {
   }
 
   async init() {
-    await storage.init();
-    await this.createTVService();
-    await this.createTVSpeakerService();
-    await this.createInputSourceServices();
+    try {
+      await storage.init({
+        dir: this.platform.config.cacheDirectory || '../.node_persist',
+      });
 
-    // Wait for all services to be created before publishing
-    this.platform.api.publishExternalAccessories(PLUGIN_NAME, [this.accessory]);
+      await this.createTVService();
+      await this.createTVSpeakerService();
+      await this.createInputSourceServices();
+
+      // Wait for all services to be created before publishing
+      this.platform.api.publishExternalAccessories(PLUGIN_NAME, [this.accessory]);
+    } catch(err) {
+      this.platform.log.error(err);
+    }
   }
 
   async createTVService() {
@@ -197,9 +204,19 @@ export class YamahaAVRAccessory {
   async createInputSourceServices() {
     await this.updateInputSources();
 
-    return new Promise(resolve => {
+    return new Promise((resolve, reject) => {
       this.state.inputs.forEach(async (input, i) => {
-        const cachedService: CachedServiceData | undefined = await storage.getItem(`input_${i}`);
+        let cachedService: CachedServiceData | undefined;
+
+        try {
+          cachedService = await storage.getItem(`input_${i}`);
+        } catch(err) {
+          reject(`
+            Could not access cache.
+            Please check your Homebridge instance has permission to access "${this.platform.config.cacheDirectory || '../.node-persist'}"
+            or set a different cache directory using the "cacheDirectory" config property.
+          `);
+        }
 
         const inputService = this.accessory.addService(
           this.platform.Service.InputSource,
@@ -268,14 +285,22 @@ export class YamahaAVRAccessory {
         this.service.addLinkedService(inputService);
         this.inputServices.push(inputService);
 
-        // Cache Data
-        await storage.setItem(`input_${i}`, {
-          ConfiguredName: inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value,
-          CurrentVisibilityState: inputService.getCharacteristic(this.platform.Characteristic.CurrentVisibilityState).value,
-        });
+        try {
+          // Cache Data
+          await storage.setItem(`input_${i}`, {
+            ConfiguredName: inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value,
+            CurrentVisibilityState: inputService.getCharacteristic(this.platform.Characteristic.CurrentVisibilityState).value,
+          });
 
-        if (this.inputServices.length === this.state.inputs.length) {
-          resolve();
+          if (this.inputServices.length === this.state.inputs.length) {
+            resolve();
+          }
+        } catch (err) {
+          reject(`
+            Could not write to cache.
+            Please check your Homebridge instance has permission to access "${this.platform.config.cacheDirectory || '../.node-persist'}"
+            or set a different cache directory using the "cacheDirectory" config property.
+          `);
         }
       });
     });

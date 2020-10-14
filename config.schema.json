@@ -11,11 +11,17 @@
         "required": true,
         "default": ""
       },
-      "inputs": {
+      "name": {
         "title": "Name",
         "type": "string",
         "required": false,
         "default": "Yamaha AVR"
+      },
+      "cacheDirectory": {
+        "title": "Cache Directory",
+        "type": "string",
+        "required": false,
+        "default": "../.node_persist"
       }
     }
   }
