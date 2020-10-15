@@ -45,7 +45,7 @@ Example configuration:
 ```
 
 #### Important Installation/Configuration Notes:
-Yamaha AVR caches input/name data using (https://github.com/simonlast/node-persist)[node-persist], by default this should be located within the `homebridge-yamaha-avr` plugin directory. If your homebridge instance cannot write to this directory you can define an alternative cache data location using the `cacheDirectory` config option
+Yamaha AVR caches input/name data using [node-persist](https://github.com/simonlast/node-persist), by default this should be located within the `homebridge-yamaha-avr` plugin directory. If your homebridge instance cannot write to this directory you can define an alternative cache data location using the `cacheDirectory` config option
 
 The AVR is published as an external accessory so you'll need to add it manually.
 
