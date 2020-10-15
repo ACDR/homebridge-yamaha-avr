@@ -38,10 +38,14 @@ Example configuration:
       {
         "platform": "yamaha-avr",
         "name": "Yamaha RX-V685",
-        "ip": "192.168.1.12"
+        "ip": "192.168.1.12",
+        "cacheDirectory": ""
     ]
-  }
+}
 ```
+
+#### Important Installation/Configuration Notes:
+Yamaha AVR caches input/name data using (https://github.com/simonlast/node-persist)[node-persist], by default this should be located within the `homebridge-yamaha-avr` plugin directory. If your homebridge instance cannot write to this directory you can define an alternative cache data location using the `cacheDirectory` config option
 
 The AVR is published as an external accessory so you'll need to add it manually.
 
@@ -51,7 +55,6 @@ The AVR should then show as an option, enter your Homebridge PIN and you should 
 
 <img src="https://user-images.githubusercontent.com/1072488/95639584-78824280-0af5-11eb-94cf-c6a8dd9793f4.png" width="320" />
 
-## Notes
 You can define the ports external accessories are assigned by setting a range in your Homebridge config:
 https://github.com/homebridge/homebridge/blob/master/config-sample.json#L12
 
