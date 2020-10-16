@@ -50,9 +50,17 @@ export class YamahaAVRAccessory {
 
   async init() {
     try {
-      await storage.init({
-        dir: this.platform.config.cacheDirectory || '../.node_persist',
-      });
+      try {
+        await storage.init({
+          dir: this.platform.config.cacheDirectory || '../.node_persist',
+        });
+      } catch(err) {
+        this.platform.log.error(`
+          Could not create cache directory.
+          Please check your Homebridge instance has permission to read/write to "${err.path}"
+          or set a different cache directory using the "cacheDirectory" config property.
+        `);
+      }
 
       await this.createTVService();
       await this.createTVSpeakerService();
@@ -298,7 +306,7 @@ export class YamahaAVRAccessory {
         } catch (err) {
           reject(`
             Could not write to cache.
-            Please check your Homebridge instance has permission to access "${this.platform.config.cacheDirectory || '../.node-persist'}"
+            Please check your Homebridge instance has permission to write to "${this.platform.config.cacheDirectory || '../.node-persist'}"
             or set a different cache directory using the "cacheDirectory" config property.
           `);
         }
