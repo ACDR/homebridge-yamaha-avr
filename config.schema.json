@@ -21,7 +21,7 @@
         "title": "Cache Directory",
         "type": "string",
         "required": false,
-        "default": "../.node_persist"
+        "default": ".node_persist"
       }
     }
   }

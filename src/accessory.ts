@@ -221,7 +221,7 @@ export class YamahaAVRAccessory {
         } catch(err) {
           reject(`
             Could not access cache.
-            Please check your Homebridge instance has permission to access "${this.platform.config.cacheDirectory || '../.node-persist'}"
+            Please check your Homebridge instance has permission to access "${err.path}"
             or set a different cache directory using the "cacheDirectory" config property.
           `);
         }
@@ -311,7 +311,7 @@ export class YamahaAVRAccessory {
             reject(`
               Could not write to cache.
               Please check your Homebridge instance has permission to write to
-              "${this.platform.config.cacheDirectory || '../.node-persist'}"
+              "${err.path}"
               or set a different cache directory using the "cacheDirectory" config property.
             `);
           }
