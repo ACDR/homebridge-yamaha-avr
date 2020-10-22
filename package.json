@@ -2,7 +2,7 @@
   "license": "UNLICENSED",
   "displayName": "Yamaha AVR",
   "name": "homebridge-yamaha-avr",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "homebridge-plugin - Add a Yamaha AVR as a HomeKit Audio Receiver with Power, Input, Volume & Remote Control",
   "author": {
     "name": "ACDR",

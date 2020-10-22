@@ -226,88 +226,99 @@ export class YamahaAVRAccessory {
           `);
         }
 
-        const inputService = this.accessory.addService(
-          this.platform.Service.InputSource,
-          this.platform.api.hap.uuid.generate(input.id),
-          input.name,
-        );
-
-        inputService
-          .setCharacteristic(this.platform.Characteristic.Identifier, i)
-          .setCharacteristic(this.platform.Characteristic.Name, input.name)
-          .setCharacteristic(this.platform.Characteristic.IsConfigured, this.platform.Characteristic.IsConfigured.CONFIGURED)
-          .setCharacteristic(this.platform.Characteristic.CurrentVisibilityState, this.platform.Characteristic.CurrentVisibilityState.SHOWN)
-          .setCharacteristic(this.platform.Characteristic.InputSourceType, this.platform.Characteristic.InputSourceType.APPLICATION)
-          .setCharacteristic(this.platform.Characteristic.InputDeviceType, this.platform.Characteristic.InputDeviceType.TV);
-
-        inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName)
-          .on('set', (name, callback) => {
-            this.platform.log.debug(`Set input (${input.id}) name to ${name}`);
-            inputService.updateCharacteristic(this.platform.Characteristic.ConfiguredName, name);
-
-            if (cachedService?.ConfiguredName !== name) {
-              storage.setItem(`input_${i}`, {
-                ConfiguredName: name,
-                CurrentVisibilityState: inputService.getCharacteristic(this.platform.Characteristic.CurrentVisibilityState).value,
-              });
-            }
-
-            callback(null);
-          });
-
-        inputService.getCharacteristic(this.platform.Characteristic.TargetVisibilityState)
-          .on('set', (targetVisibilityState, callback) => {
-            this.platform.log.debug(`
-              Set input (${input.id}) visibility state to
-              ${targetVisibilityState === this.platform.Characteristic.TargetVisibilityState.HIDDEN ? 'HIDDEN' : 'SHOWN'}
-            `);
-            inputService.updateCharacteristic(this.platform.Characteristic.CurrentVisibilityState, targetVisibilityState);
-
-            if (cachedService?.CurrentVisibilityState !== targetVisibilityState) {
-              storage.setItem(`input_${i}`, {
-                ConfiguredName: inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value,
-                CurrentVisibilityState: targetVisibilityState,
-              });
-            }
-
-            callback(null);
-          });
-
-        inputService.getCharacteristic(this.platform.Characteristic.Name)
-          .on('get', callback => callback(null, input.name));
-
-        if (cachedService) {
-          if (this.platform.Characteristic.CurrentVisibilityState.SHOWN !== cachedService.CurrentVisibilityState) {
-            this.platform.log.debug(`Restoring input ${input.id} visibility state from cache`);
-            inputService
-              .setCharacteristic(this.platform.Characteristic.CurrentVisibilityState, cachedService.CurrentVisibilityState);
-          }
-
-          if (input.name !== cachedService.ConfiguredName) {
-            this.platform.log.debug(`Restoring input ${input.id} configured name from cache`);
-            inputService
-              .setCharacteristic(this.platform.Characteristic.ConfiguredName, cachedService.ConfiguredName);
-          }
-        }
-
-        this.service.addLinkedService(inputService);
-        this.inputServices.push(inputService);
-
         try {
-          // Cache Data
-          await storage.setItem(`input_${i}`, {
-            ConfiguredName: inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value,
-            CurrentVisibilityState: inputService.getCharacteristic(this.platform.Characteristic.CurrentVisibilityState).value,
-          });
+          const inputService = this.accessory.addService(
+            this.platform.Service.InputSource,
+            this.platform.api.hap.uuid.generate(input.id),
+            input.name,
+          );
 
-          if (this.inputServices.length === this.state.inputs.length) {
-            resolve();
+          inputService
+            .setCharacteristic(this.platform.Characteristic.Identifier, i)
+            .setCharacteristic(this.platform.Characteristic.Name, input.name)
+            .setCharacteristic(this.platform.Characteristic.IsConfigured, this.platform.Characteristic.IsConfigured.CONFIGURED)
+            .setCharacteristic(
+              this.platform.Characteristic.CurrentVisibilityState,
+              this.platform.Characteristic.CurrentVisibilityState.SHOWN,
+            )
+            .setCharacteristic(this.platform.Characteristic.InputSourceType, this.platform.Characteristic.InputSourceType.APPLICATION)
+            .setCharacteristic(this.platform.Characteristic.InputDeviceType, this.platform.Characteristic.InputDeviceType.TV);
+
+          inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName)
+            .on('set', (name, callback) => {
+              this.platform.log.debug(`Set input (${input.id}) name to ${name}`);
+              inputService.updateCharacteristic(this.platform.Characteristic.ConfiguredName, name);
+
+              if (cachedService?.ConfiguredName !== name) {
+                storage.setItem(`input_${i}`, {
+                  ConfiguredName: name,
+                  CurrentVisibilityState: inputService.getCharacteristic(this.platform.Characteristic.CurrentVisibilityState).value,
+                });
+              }
+
+              callback(null);
+            });
+
+          inputService.getCharacteristic(this.platform.Characteristic.TargetVisibilityState)
+            .on('set', (targetVisibilityState, callback) => {
+              this.platform.log.debug(`
+                Set input (${input.id}) visibility state to
+                ${targetVisibilityState === this.platform.Characteristic.TargetVisibilityState.HIDDEN ? 'HIDDEN' : 'SHOWN'}
+              `);
+              inputService.updateCharacteristic(this.platform.Characteristic.CurrentVisibilityState, targetVisibilityState);
+
+              if (cachedService?.CurrentVisibilityState !== targetVisibilityState) {
+                storage.setItem(`input_${i}`, {
+                  ConfiguredName: inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value,
+                  CurrentVisibilityState: targetVisibilityState,
+                });
+              }
+
+              callback(null);
+            });
+
+          inputService.getCharacteristic(this.platform.Characteristic.Name)
+            .on('get', callback => callback(null, input.name));
+
+          if (cachedService) {
+            if (this.platform.Characteristic.CurrentVisibilityState.SHOWN !== cachedService.CurrentVisibilityState) {
+              this.platform.log.debug(`Restoring input ${input.id} visibility state from cache`);
+              inputService
+                .setCharacteristic(this.platform.Characteristic.CurrentVisibilityState, cachedService.CurrentVisibilityState);
+            }
+
+            if (input.name !== cachedService.ConfiguredName) {
+              this.platform.log.debug(`Restoring input ${input.id} configured name from cache`);
+              inputService
+                .setCharacteristic(this.platform.Characteristic.ConfiguredName, cachedService.ConfiguredName);
+            }
+          }
+
+          this.service.addLinkedService(inputService);
+          this.inputServices.push(inputService);
+
+          try {
+            // Cache Data
+            await storage.setItem(`input_${i}`, {
+              ConfiguredName: inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value,
+              CurrentVisibilityState: inputService.getCharacteristic(this.platform.Characteristic.CurrentVisibilityState).value,
+            });
+
+            if (this.inputServices.length === this.state.inputs.length) {
+              resolve();
+            }
+          } catch (err) {
+            reject(`
+              Could not write to cache.
+              Please check your Homebridge instance has permission to write to
+              "${this.platform.config.cacheDirectory || '../.node-persist'}"
+              or set a different cache directory using the "cacheDirectory" config property.
+            `);
           }
         } catch (err) {
-          reject(`
-            Could not write to cache.
-            Please check your Homebridge instance has permission to write to "${this.platform.config.cacheDirectory || '../.node-persist'}"
-            or set a different cache directory using the "cacheDirectory" config property.
+          this.platform.log.error(`
+            Failed to add input service ${input.name}:
+            ${err}
           `);
         }
       });
@@ -334,6 +345,11 @@ export class YamahaAVRAccessory {
         this.state.inputs = [];
 
         features.forEach((feature, i) => {
+          if (this.state.inputs.find(input => input.id === feature.replace('_', ' ') || input.name === feature.replace('_', ' '))) {
+            // Input already exists
+            return;
+          }
+
           this.state.inputs.push({
             id: feature.replace('_', ' '),
             name: feature.replace('_', ' '),
@@ -348,21 +364,22 @@ export class YamahaAVRAccessory {
           // check if the property/key is defined in the object itself, not in parent
           if (availableInputs[0].hasOwnProperty(key)) { // eslint-disable-line
             let id = String(key).replace('_', '');
+            const name = availableInputs[0][key][0];
 
             if (key.includes('MusicCast_Link') || key.includes('NET_RADIO')) {
               id = String(key).replace('_', ' ');
             }
 
-            const input: Input = {
-              id,
-              name: availableInputs[0][key][0],
-              index: i,
-            };
-
-            if (!this.state.inputs.find(input => input.id === id)) {
-              // add input only if it is not already in inputs
-              this.state.inputs.push(input);
+            if (this.state.inputs.find(input => input.id === id || input.name === name)) {
+              // Input already exists
+              return;
             }
+
+            this.state.inputs.push({
+              id,
+              name,
+              index: i,
+            });
 
             i++;
           }
