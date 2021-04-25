@@ -52,7 +52,7 @@ export class YamahaAVRAccessory {
     try {
       try {
         await storage.init({
-          dir: this.platform.config.cacheDirectory || '../.node_persist',
+          dir: this.platform.config.cacheDirectory || this.platform.api.user.storagePath() + '/.yamahaAVR/',
         });
       } catch(err) {
         this.platform.log.error(`
