@@ -19,9 +19,9 @@
       },
       "cacheDirectory": {
         "title": "Cache Directory",
+        "description": "Default: ~/.homebridge/.yamahaAVR",
         "type": "string",
-        "required": false,
-        "default": ".node_persist"
+        "required": false
       }
     }
   }
