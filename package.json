@@ -21,7 +21,7 @@
     "homebridge": ">=1.0.0"
   },
   "dependencies": {
-    "node-fetch": "^2.6.1",
+    "node-fetch": "^3.1.1",
     "node-persist": "^3.1.0",
     "yamaha-nodejs": "^0.9.6"
   },
