@@ -1,4 +1,10 @@
-import { Service, PlatformAccessory, CharacteristicValue, CharacteristicSetCallback, CharacteristicGetCallback } from 'homebridge';
+import {
+  Service,
+  PlatformAccessory,
+  CharacteristicValue,
+  CharacteristicSetCallback,
+  CharacteristicGetCallback,
+} from 'homebridge';
 import fetch from 'node-fetch';
 import { YamahaAVRPlatform } from './platform';
 import { PLUGIN_NAME } from './settings';
@@ -26,38 +32,38 @@ export class YamahaAVRAccessory {
     connectionError: false as boolean,
   };
 
-  constructor(
-    private readonly platform: YamahaAVRPlatform,
-    private readonly accessory: PlatformAccessory,
-  ) {
+  constructor(private readonly platform: YamahaAVRPlatform, private readonly accessory: PlatformAccessory) {
     // set the AVR accessory information
-    this.accessory.getService(this.platform.Service.AccessoryInformation)!
+    this.accessory
+      .getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Yamaha')
       .setCharacteristic(this.platform.Characteristic.Model, this.accessory.context.modelName || 'Unknown')
       .setCharacteristic(this.platform.Characteristic.SerialNumber, this.accessory.context.systemId || 'Unknown')
-      .setCharacteristic(this.platform.Characteristic.FirmwareRevision, this.accessory.context.firmwareVersion || 'Unknown');
+      .setCharacteristic(
+        this.platform.Characteristic.FirmwareRevision,
+        this.accessory.context.firmwareVersion || 'Unknown',
+      );
 
     this.service = this.accessory.addService(this.platform.Service.Television);
 
     this.init();
 
     // regularly ping the AVR to keep power/input state syncronised
-    setInterval(
-      this.getPowerState.bind(this, this.updateAVRState.bind(this)),
-      5000,
-    );
+    setInterval(this.getPowerState.bind(this, this.updateAVRState.bind(this)), 5000);
   }
 
   async init() {
     try {
+      const path = this.platform.config.cacheDirectory || this.platform.api.user.storagePath() + '/.yamahaAVR/';
+
       try {
         await storage.init({
-          dir: this.platform.config.cacheDirectory || this.platform.api.user.storagePath() + '/.yamahaAVR/',
+          dir: path,
         });
-      } catch(err) {
+      } catch (err) {
         this.platform.log.error(`
           Could not create cache directory.
-          Please check your Homebridge instance has permission to read/write to "${err.path}"
+          Please check your Homebridge instance has permission to read/write to "${path}"
           or set a different cache directory using the "cacheDirectory" config property.
         `);
       }
@@ -68,25 +74,23 @@ export class YamahaAVRAccessory {
 
       // Wait for all services to be created before publishing
       this.platform.api.publishExternalAccessories(PLUGIN_NAME, [this.accessory]);
-    } catch(err) {
-      this.platform.log.error(err);
+    } catch (err) {
+      this.platform.log.error(err as string);
     }
   }
 
   async createTVService() {
     // Set Television Service Name & Discovery Mode
     this.service
-      .setCharacteristic(
-        this.platform.Characteristic.ConfiguredName,
-        this.accessory.context.device.displayName,
-      )
+      .setCharacteristic(this.platform.Characteristic.ConfiguredName, this.accessory.context.device.displayName)
       .setCharacteristic(
         this.platform.Characteristic.SleepDiscoveryMode,
         this.platform.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE,
       );
 
     // Power State Get/Set
-    this.service.getCharacteristic(this.platform.Characteristic.Active)
+    this.service
+      .getCharacteristic(this.platform.Characteristic.Active)
       .on('get', this.getPowerState.bind(this))
       .on('set', this.setPowerState.bind(this));
 
@@ -97,98 +101,99 @@ export class YamahaAVRAccessory {
       .on('set', this.setInputState.bind(this));
 
     // Remote Key Set
-    this.service.getCharacteristic(this.platform.Characteristic.RemoteKey)
-      .on('set', (newValue, callback) => {
-        const sendRemoteCode = (remoteKey, callback) => {
-          fetch(`http://${this.platform.config.ip}/YamahaExtendedControl/v1/system/sendIrCode?code=${remoteKey}`).then(response => {
+    this.service.getCharacteristic(this.platform.Characteristic.RemoteKey).on('set', (newValue, callback) => {
+      const sendRemoteCode = (remoteKey, callback) => {
+        fetch(`http://${this.platform.config.ip}/YamahaExtendedControl/v1/system/sendIrCode?code=${remoteKey}`).then(
+          (response) => {
             callback(response);
-          });
-        };
+          },
+        );
+      };
 
-        switch(newValue) {
-          case this.platform.Characteristic.RemoteKey.REWIND:
-            this.platform.log.info('set Remote Key Pressed: REWIND');
-            this.platform.YamahaAVR.rewind();
-            callback(null);
-            break;
+      switch (newValue) {
+        case this.platform.Characteristic.RemoteKey.REWIND:
+          this.platform.log.info('set Remote Key Pressed: REWIND');
+          this.platform.YamahaAVR.rewind();
+          callback(null);
+          break;
 
-          case this.platform.Characteristic.RemoteKey.FAST_FORWARD:
-            this.platform.log.info('set Remote Key Pressed: FAST_FORWARD');
-            this.platform.YamahaAVR.skip();
-            callback(null);
-            break;
+        case this.platform.Characteristic.RemoteKey.FAST_FORWARD:
+          this.platform.log.info('set Remote Key Pressed: FAST_FORWARD');
+          this.platform.YamahaAVR.skip();
+          callback(null);
+          break;
 
-          case this.platform.Characteristic.RemoteKey.NEXT_TRACK:
-            this.platform.log.info('set Remote Key Pressed: NEXT_TRACK');
-            sendRemoteCode('7F016D92', callback);
-            break;
+        case this.platform.Characteristic.RemoteKey.NEXT_TRACK:
+          this.platform.log.info('set Remote Key Pressed: NEXT_TRACK');
+          sendRemoteCode('7F016D92', callback);
+          break;
 
-          case this.platform.Characteristic.RemoteKey.PREVIOUS_TRACK:
-            this.platform.log.info('set Remote Key Pressed: PREVIOUS_TRACK');
-            sendRemoteCode('7F016C93', callback);
-            break;
+        case this.platform.Characteristic.RemoteKey.PREVIOUS_TRACK:
+          this.platform.log.info('set Remote Key Pressed: PREVIOUS_TRACK');
+          sendRemoteCode('7F016C93', callback);
+          break;
 
-          case this.platform.Characteristic.RemoteKey.ARROW_UP:
-            this.platform.log.info('set Remote Key Pressed: ARROW_UP');
-            sendRemoteCode('7A859D62', callback);
-            break;
+        case this.platform.Characteristic.RemoteKey.ARROW_UP:
+          this.platform.log.info('set Remote Key Pressed: ARROW_UP');
+          sendRemoteCode('7A859D62', callback);
+          break;
 
-          case this.platform.Characteristic.RemoteKey.ARROW_DOWN:
-            this.platform.log.info('set Remote Key Pressed: ARROW_DOWN');
-            sendRemoteCode('7A859C63', callback);
-            break;
+        case this.platform.Characteristic.RemoteKey.ARROW_DOWN:
+          this.platform.log.info('set Remote Key Pressed: ARROW_DOWN');
+          sendRemoteCode('7A859C63', callback);
+          break;
 
-          case this.platform.Characteristic.RemoteKey.ARROW_LEFT:
-            this.platform.log.info('set Remote Key Pressed: ARROW_LEFT');
-            sendRemoteCode('7A859F60', callback);
-            break;
+        case this.platform.Characteristic.RemoteKey.ARROW_LEFT:
+          this.platform.log.info('set Remote Key Pressed: ARROW_LEFT');
+          sendRemoteCode('7A859F60', callback);
+          break;
 
-          case this.platform.Characteristic.RemoteKey.ARROW_RIGHT:
-            this.platform.log.info('set Remote Key Pressed: ARROW_RIGHT');
-            sendRemoteCode('7A859E61', callback);
-            break;
+        case this.platform.Characteristic.RemoteKey.ARROW_RIGHT:
+          this.platform.log.info('set Remote Key Pressed: ARROW_RIGHT');
+          sendRemoteCode('7A859E61', callback);
+          break;
 
-          case this.platform.Characteristic.RemoteKey.SELECT:
-            this.platform.log.info('set Remote Key Pressed: SELECT');
-            sendRemoteCode('7A85DE21', callback);
-            break;
+        case this.platform.Characteristic.RemoteKey.SELECT:
+          this.platform.log.info('set Remote Key Pressed: SELECT');
+          sendRemoteCode('7A85DE21', callback);
+          break;
 
-          case this.platform.Characteristic.RemoteKey.BACK:
-            this.platform.log.info('set Remote Key Pressed: BACK');
-            sendRemoteCode('7A85AA55', callback);
-            break;
+        case this.platform.Characteristic.RemoteKey.BACK:
+          this.platform.log.info('set Remote Key Pressed: BACK');
+          sendRemoteCode('7A85AA55', callback);
+          break;
 
-          case this.platform.Characteristic.RemoteKey.EXIT:
-            this.platform.log.info('set Remote Key Pressed: EXIT');
-            sendRemoteCode('7A85AA55', callback);
-            break;
+        case this.platform.Characteristic.RemoteKey.EXIT:
+          this.platform.log.info('set Remote Key Pressed: EXIT');
+          sendRemoteCode('7A85AA55', callback);
+          break;
 
-          case this.platform.Characteristic.RemoteKey.PLAY_PAUSE:
-            this.platform.log.info('set Remote Key Pressed: PLAY_PAUSE');
-            if (this.state.isPlaying) {
-              this.platform.YamahaAVR.pause();
-              // this.sendRemoteCode('7F016798', callback);
-            } else {
-              this.platform.YamahaAVR.play();
-              // this.sendRemoteCode('7F016897', callback);
-            }
+        case this.platform.Characteristic.RemoteKey.PLAY_PAUSE:
+          this.platform.log.info('set Remote Key Pressed: PLAY_PAUSE');
+          if (this.state.isPlaying) {
+            this.platform.YamahaAVR.pause();
+            // this.sendRemoteCode('7F016798', callback);
+          } else {
+            this.platform.YamahaAVR.play();
+            // this.sendRemoteCode('7F016897', callback);
+          }
 
-            this.state.isPlaying = !this.state.isPlaying;
+          this.state.isPlaying = !this.state.isPlaying;
 
-            callback(null);
+          callback(null);
 
-            break;
+          break;
 
-          case this.platform.Characteristic.RemoteKey.INFORMATION:
-            this.platform.log.info('set Remote Key Pressed: INFORMATION');
-            sendRemoteCode('7A851F60', callback);
-            break;
+        case this.platform.Characteristic.RemoteKey.INFORMATION:
+          this.platform.log.info('set Remote Key Pressed: INFORMATION');
+          sendRemoteCode('7A851F60', callback);
+          break;
 
-          default:
-            this.platform.log.info('unhandled Remote Key Pressed');
-            break;
-        }
-      });
+        default:
+          this.platform.log.info('unhandled Remote Key Pressed');
+          break;
+      }
+    });
 
     return;
   }
@@ -198,10 +203,14 @@ export class YamahaAVRAccessory {
 
     speakerService
       .setCharacteristic(this.platform.Characteristic.Active, this.platform.Characteristic.Active.ACTIVE)
-      .setCharacteristic(this.platform.Characteristic.VolumeControlType, this.platform.Characteristic.VolumeControlType.ABSOLUTE);
+      .setCharacteristic(
+        this.platform.Characteristic.VolumeControlType,
+        this.platform.Characteristic.VolumeControlType.ABSOLUTE,
+      );
 
     // handle volume control
-    speakerService.getCharacteristic(this.platform.Characteristic.VolumeSelector)
+    speakerService
+      .getCharacteristic(this.platform.Characteristic.VolumeSelector)
       .on('set', (direction: CharacteristicValue, callback: CharacteristicSetCallback) => {
         this.setVolume(direction, callback);
       });
@@ -212,13 +221,13 @@ export class YamahaAVRAccessory {
   async createInputSourceServices() {
     await this.updateInputSources();
 
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       this.state.inputs.forEach(async (input, i) => {
         let cachedService: CachedServiceData | undefined;
 
         try {
           cachedService = await storage.getItem(`input_${i}`);
-        } catch(err) {
+        } catch (err) {
           reject(`
             Could not access cache.
             Please check your Homebridge instance has permission to access "${this.platform.config.cacheDirectory}"
@@ -236,36 +245,53 @@ export class YamahaAVRAccessory {
           inputService
             .setCharacteristic(this.platform.Characteristic.Identifier, i)
             .setCharacteristic(this.platform.Characteristic.Name, input.name)
-            .setCharacteristic(this.platform.Characteristic.IsConfigured, this.platform.Characteristic.IsConfigured.CONFIGURED)
+            .setCharacteristic(
+              this.platform.Characteristic.IsConfigured,
+              this.platform.Characteristic.IsConfigured.CONFIGURED,
+            )
             .setCharacteristic(
               this.platform.Characteristic.CurrentVisibilityState,
               this.platform.Characteristic.CurrentVisibilityState.SHOWN,
             )
-            .setCharacteristic(this.platform.Characteristic.InputSourceType, this.platform.Characteristic.InputSourceType.APPLICATION)
-            .setCharacteristic(this.platform.Characteristic.InputDeviceType, this.platform.Characteristic.InputDeviceType.TV);
+            .setCharacteristic(
+              this.platform.Characteristic.InputSourceType,
+              this.platform.Characteristic.InputSourceType.APPLICATION,
+            )
+            .setCharacteristic(
+              this.platform.Characteristic.InputDeviceType,
+              this.platform.Characteristic.InputDeviceType.TV,
+            );
 
-          inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName)
-            .on('set', (name, callback) => {
-              this.platform.log.debug(`Set input (${input.id}) name to ${name}`);
-              inputService.updateCharacteristic(this.platform.Characteristic.ConfiguredName, name);
+          inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).on('set', (name, callback) => {
+            this.platform.log.debug(`Set input (${input.id}) name to ${name}`);
+            inputService.updateCharacteristic(this.platform.Characteristic.ConfiguredName, name);
 
-              if (cachedService?.ConfiguredName !== name) {
-                storage.setItem(`input_${i}`, {
-                  ConfiguredName: name,
-                  CurrentVisibilityState: inputService.getCharacteristic(this.platform.Characteristic.CurrentVisibilityState).value,
-                });
-              }
+            if (cachedService?.ConfiguredName !== name) {
+              storage.setItem(`input_${i}`, {
+                ConfiguredName: name,
+                CurrentVisibilityState: inputService.getCharacteristic(
+                  this.platform.Characteristic.CurrentVisibilityState,
+                ).value,
+              });
+            }
 
-              callback(null);
-            });
+            callback(null);
+          });
 
-          inputService.getCharacteristic(this.platform.Characteristic.TargetVisibilityState)
+          inputService
+            .getCharacteristic(this.platform.Characteristic.TargetVisibilityState)
             .on('set', (targetVisibilityState, callback) => {
               this.platform.log.debug(`
                 Set input (${input.id}) visibility state to
-                ${targetVisibilityState === this.platform.Characteristic.TargetVisibilityState.HIDDEN ? 'HIDDEN' : 'SHOWN'}
-              `);
-              inputService.updateCharacteristic(this.platform.Characteristic.CurrentVisibilityState, targetVisibilityState);
+                ${
+                  targetVisibilityState === this.platform.Characteristic.TargetVisibilityState.HIDDEN
+                    ? 'HIDDEN'
+                    : 'SHOWN'
+                } `);
+              inputService.updateCharacteristic(
+                this.platform.Characteristic.CurrentVisibilityState,
+                targetVisibilityState,
+              );
 
               if (cachedService?.CurrentVisibilityState !== targetVisibilityState) {
                 storage.setItem(`input_${i}`, {
@@ -277,20 +303,22 @@ export class YamahaAVRAccessory {
               callback(null);
             });
 
-          inputService.getCharacteristic(this.platform.Characteristic.Name)
-            .on('get', callback => callback(null, input.name));
+          inputService
+            .getCharacteristic(this.platform.Characteristic.Name)
+            .on('get', (callback) => callback(null, input.name));
 
           if (cachedService) {
             if (this.platform.Characteristic.CurrentVisibilityState.SHOWN !== cachedService.CurrentVisibilityState) {
               this.platform.log.debug(`Restoring input ${input.id} visibility state from cache`);
-              inputService
-                .setCharacteristic(this.platform.Characteristic.CurrentVisibilityState, cachedService.CurrentVisibilityState);
+              inputService.setCharacteristic(
+                this.platform.Characteristic.CurrentVisibilityState,
+                cachedService.CurrentVisibilityState,
+              );
             }
 
             if (input.name !== cachedService.ConfiguredName) {
               this.platform.log.debug(`Restoring input ${input.id} configured name from cache`);
-              inputService
-                .setCharacteristic(this.platform.Characteristic.ConfiguredName, cachedService.ConfiguredName);
+              inputService.setCharacteristic(this.platform.Characteristic.ConfiguredName, cachedService.ConfiguredName);
             }
           }
 
@@ -301,7 +329,9 @@ export class YamahaAVRAccessory {
             // Cache Data
             await storage.setItem(`input_${i}`, {
               ConfiguredName: inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value,
-              CurrentVisibilityState: inputService.getCharacteristic(this.platform.Characteristic.CurrentVisibilityState).value,
+              CurrentVisibilityState: inputService.getCharacteristic(
+                this.platform.Characteristic.CurrentVisibilityState,
+              ).value,
             });
 
             if (this.inputServices.length === this.state.inputs.length) {
@@ -341,11 +371,15 @@ export class YamahaAVRAccessory {
     }
 
     return this.platform.YamahaAVR.getAvailableInputsWithNames()
-      .then(availableInputs => {
+      .then((availableInputs) => {
         this.state.inputs = [];
 
         features.forEach((feature, i) => {
-          if (this.state.inputs.find(input => input.id === feature.replace('_', ' ') || input.name === feature.replace('_', ' '))) {
+          if (
+            this.state.inputs.find(
+              (input) => input.id === feature.replace('_', ' ') || input.name === feature.replace('_', ' '),
+            )
+          ) {
             // Input already exists
             return;
           }
@@ -362,7 +396,8 @@ export class YamahaAVRAccessory {
 
         for (const key in availableInputs[0]) {
           // check if the property/key is defined in the object itself, not in parent
-          if (availableInputs[0].hasOwnProperty(key)) { // eslint-disable-line
+          if (availableInputs[0].hasOwnProperty(key)) {
+            // eslint-disable-line
             let id = String(key).replace('_', '');
             const name = availableInputs[0][key][0];
 
@@ -370,7 +405,7 @@ export class YamahaAVRAccessory {
               id = String(key).replace('_', ' ');
             }
 
-            if (this.state.inputs.find(input => input.id === id || input.name === name)) {
+            if (this.state.inputs.find((input) => input.id === id || input.name === name)) {
               // Input already exists
               return;
             }
@@ -406,7 +441,7 @@ export class YamahaAVRAccessory {
 
         this.service.updateCharacteristic(
           this.platform.Characteristic.ActiveIdentifier,
-          this.state.inputs.findIndex(input => input.id === basicInfo.getCurrentInput()),
+          this.state.inputs.findIndex((input) => input.id === basicInfo.getCurrentInput()),
         );
 
         if (this.state.connectionError) {
@@ -431,10 +466,10 @@ export class YamahaAVRAccessory {
 
   getPowerState(callback: CharacteristicGetCallback) {
     this.platform.YamahaAVR.isOn()
-      .then(result => {
+      .then((result) => {
         callback(null, result);
       })
-      .catch(error => {
+      .catch((error) => {
         callback(error, false);
       });
   }
@@ -453,7 +488,7 @@ export class YamahaAVRAccessory {
 
   setVolume(direction: CharacteristicValue, callback: CharacteristicSetCallback) {
     this.platform.YamahaAVR.getBasicInfo()
-      .then(basicInfo => {
+      .then((basicInfo) => {
         const volume = basicInfo.getVolume();
 
         if (direction === 0) {
@@ -466,32 +501,31 @@ export class YamahaAVRAccessory {
 
         callback(null);
       })
-      .catch(error => {
+      .catch((error) => {
         callback(error, false);
       });
   }
 
   getInputState(callback: CharacteristicGetCallback) {
-    this.platform.YamahaAVR.getBasicInfo()
-      .then(basicInfo => {
-        const input: Input | undefined = this.state.inputs.find(input => input.id === basicInfo.getCurrentInput());
+    this.platform.YamahaAVR.getBasicInfo().then((basicInfo) => {
+      const input: Input | undefined = this.state.inputs.find((input) => input.id === basicInfo.getCurrentInput());
 
-        this.platform.log.debug(`Current input: ${basicInfo.getCurrentInput()}`);
+      this.platform.log.debug(`Current input: ${basicInfo.getCurrentInput()}`);
 
-        if (!input) {
-          return;
+      if (!input) {
+        return;
+      }
+
+      this.platform.log.info(`Current input: ${input.name} (${input.id})`);
+
+      this.state.inputs.filter((input, index) => {
+        if (input.id === basicInfo.getCurrentInput()) {
+          return callback(null, index);
         }
 
-        this.platform.log.info(`Current input: ${input.name} (${input.id})`);
-
-        this.state.inputs.filter((input, index) => {
-          if (input.id === basicInfo.getCurrentInput()) {
-            return callback(null, index);
-          }
-
-          return;
-        });
+        return;
       });
+    });
   }
 
   setInputState(inputIdentifier: CharacteristicValue, callback: CharacteristicSetCallback) {
