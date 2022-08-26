@@ -17,10 +17,12 @@ export interface YamahaAPI {
     };
   }>;
   getAvailableFeatures: () => Promise<string[]>;
-  getAvailableInputsWithNames: () => Promise<{
-    id: string;
-    name: string;
-  }[]>;
+  getAvailableInputsWithNames: () => Promise<
+    {
+      id: string;
+      name: string;
+    }[]
+  >;
   isOn: () => Promise<boolean>;
   powerOn: () => Promise<string>;
   powerOff: () => Promise<string>;

@@ -8,7 +8,7 @@ import {
 import fetch from 'node-fetch';
 import { YamahaAVRPlatform } from './platform';
 import { PLUGIN_NAME } from './settings';
-import storage from 'node-persist';
+import { StorageService } from './storageService';
 
 interface Input {
   id: string;
@@ -25,6 +25,7 @@ interface CachedServiceData {
 export class YamahaAVRAccessory {
   private service: Service;
   private inputServices: Service[] = [];
+  private storageService: StorageService;
 
   private state = {
     isPlaying: true as boolean,
@@ -33,6 +34,10 @@ export class YamahaAVRAccessory {
   };
 
   constructor(private readonly platform: YamahaAVRPlatform, private readonly accessory: PlatformAccessory) {
+    const cacheDirectory = this.platform.config.cacheDirectory || this.platform.api.user.storagePath() + '/.yamahaAVR/';
+    this.storageService = new StorageService(cacheDirectory);
+    this.storageService.initSync();
+
     // set the AVR accessory information
     this.accessory
       .getService(this.platform.Service.AccessoryInformation)!
@@ -56,17 +61,7 @@ export class YamahaAVRAccessory {
     try {
       const path = this.platform.config.cacheDirectory || this.platform.api.user.storagePath() + '/.yamahaAVR/';
 
-      try {
-        await storage.init({
-          dir: path,
-        });
-      } catch (err) {
-        this.platform.log.error(`
-          Could not create cache directory.
-          Please check your Homebridge instance has permission to read/write to "${path}"
-          or set a different cache directory using the "cacheDirectory" config property.
-        `);
-      }
+      this.platform.log.info(path);
 
       await this.createTVService();
       await this.createTVSpeakerService();
@@ -223,17 +218,7 @@ export class YamahaAVRAccessory {
 
     return new Promise<void>((resolve, reject) => {
       this.state.inputs.forEach(async (input, i) => {
-        let cachedService: CachedServiceData | undefined;
-
-        try {
-          cachedService = await storage.getItem(`input_${i}`);
-        } catch (err) {
-          reject(`
-            Could not access cache.
-            Please check your Homebridge instance has permission to access "${this.platform.config.cacheDirectory}"
-            or set a different cache directory using the "cacheDirectory" config property.
-          `);
-        }
+        const cachedService = await this.storageService.getItem<CachedServiceData>(`input_${i}`);
 
         try {
           const inputService = this.accessory.addService(
@@ -267,7 +252,7 @@ export class YamahaAVRAccessory {
             inputService.updateCharacteristic(this.platform.Characteristic.ConfiguredName, name);
 
             if (cachedService?.ConfiguredName !== name) {
-              storage.setItem(`input_${i}`, {
+              this.storageService.setItemSync(`input_${i}`, {
                 ConfiguredName: name,
                 CurrentVisibilityState: inputService.getCharacteristic(
                   this.platform.Characteristic.CurrentVisibilityState,
@@ -281,20 +266,17 @@ export class YamahaAVRAccessory {
           inputService
             .getCharacteristic(this.platform.Characteristic.TargetVisibilityState)
             .on('set', (targetVisibilityState, callback) => {
-              this.platform.log.debug(`
-                Set input (${input.id}) visibility state to
-                ${
-                  targetVisibilityState === this.platform.Characteristic.TargetVisibilityState.HIDDEN
-                    ? 'HIDDEN'
-                    : 'SHOWN'
-                } `);
+              const isHidden = targetVisibilityState === this.platform.Characteristic.TargetVisibilityState.HIDDEN;
+
+              this.platform.log.debug(`Set input (${input.id}) visibility state to ${isHidden ? 'HIDDEN' : 'SHOWN'} `);
+
               inputService.updateCharacteristic(
                 this.platform.Characteristic.CurrentVisibilityState,
                 targetVisibilityState,
               );
 
               if (cachedService?.CurrentVisibilityState !== targetVisibilityState) {
-                storage.setItem(`input_${i}`, {
+                this.storageService.setItemSync(`input_${i}`, {
                   ConfiguredName: inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value,
                   CurrentVisibilityState: targetVisibilityState,
                 });
@@ -327,7 +309,7 @@ export class YamahaAVRAccessory {
 
           try {
             // Cache Data
-            await storage.setItem(`input_${i}`, {
+            this.storageService.setItemSync(`input_${i}`, {
               ConfiguredName: inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value,
               CurrentVisibilityState: inputService.getCharacteristic(
                 this.platform.Characteristic.CurrentVisibilityState,
@@ -396,7 +378,7 @@ export class YamahaAVRAccessory {
 
         for (const key in availableInputs[0]) {
           // check if the property/key is defined in the object itself, not in parent
-          if (availableInputs[0].hasOwnProperty(key)) {
+          if (Object.prototype.hasOwnProperty.call(availableInputs[0], key)) {
             // eslint-disable-line
             let id = String(key).replace('_', '');
             const name = availableInputs[0][key][0];

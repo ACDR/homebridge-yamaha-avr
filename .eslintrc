@@ -1,37 +1,88 @@
 {
-  "parser": "@typescript-eslint/parser",
-  "extends": [
-    "eslint:recommended",
-    "plugin:@typescript-eslint/eslint-recommended",
-    "plugin:@typescript-eslint/recommended" // uses the recommended rules from the @typescript-eslint/eslint-plugin
-  ],
-  "parserOptions": {
-    "ecmaVersion": 2018,
-    "sourceType": "module"
+  "root": true,
+  "env": {
+    "browser": true,
+    "node": true
   },
-  "ignorePatterns": [
-    "dist"
-  ],
+  "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended", "plugin:prettier/recommended"],
+  "plugins": ["@typescript-eslint"],
   "rules": {
-    "quotes": ["warn", "single"],
-    "indent": ["warn", 2, { "SwitchCase": 1 }],
-    "semi": ["off"],
-    "comma-dangle": ["warn", "always-multiline"],
-    "dot-notation": "off",
-    "eqeqeq": "warn",
-    "curly": ["warn", "all"],
-    "brace-style": ["warn"],
-    "prefer-arrow-callback": ["warn"],
-    "max-len": ["warn", 140],
-    "no-console": ["warn"], // use the provided Homebridge log method instead
-    "no-non-null-assertion": ["off"],
-    "comma-spacing": ["error"],
-    "no-multi-spaces": ["warn", { "ignoreEOLComments": true }],
-    "lines-between-class-members": ["warn", "always", {"exceptAfterSingleLine": true}],
-    "@typescript-eslint/explicit-function-return-type": "off",
+    "semi": ["error", "always"],
+    "comma-dangle": ["error", "always-multiline"],
+    "arrow-parens": "off",
+    "object-curly-newline": [
+      "error",
+      {
+        "ObjectExpression": { "consistent": true },
+        "ObjectPattern": { "consistent": true },
+        "ImportDeclaration": { "consistent": true },
+        "ExportDeclaration": { "consistent": true }
+      }
+    ],
+    "space-before-function-paren": [
+      "error",
+      {
+        "anonymous": "always",
+        "named": "never",
+        "asyncArrow": "always"
+      }
+    ],
+    "no-multiple-empty-lines": [
+      "error",
+      {
+        "max": 1,
+        "maxEOF": 0,
+        "maxBOF": 0
+      }
+    ],
+    "lines-between-class-members": "off",
+    "indent": "off",
+    "@typescript-eslint/indent": "off",
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/no-inferrable-types": "off",
     "@typescript-eslint/no-non-null-assertion": "off",
-    "@typescript-eslint/explicit-module-boundary-types": "off",
-    "@typescript-eslint/semi": ["warn"],
-    "@typescript-eslint/member-delimiter-style": ["warn"]
-  }
+    "no-useless-constructor": "off",
+    "@typescript-eslint/no-useless-constructor": "off",
+    "@typescript-eslint/no-parameter-properties": "off",
+    "no-use-before-define": "off",
+    "no-unused-vars": "off"
+  },
+  "overrides": [
+    {
+      "files": ["*.js"],
+      "rules": {
+        "@typescript-eslint/no-var-requires": "off"
+      }
+    },
+    {
+      "files": ["*.ts"],
+      "rules": {
+        // allow TypeScript method signature overloading, see https://github.com/typescript-eslint/typescript-eslint/issues/291
+        "no-dupe-class-members": "off",
+        // disable no-undef rule for TypeScript, see https://github.com/typescript-eslint/typescript-eslint/issues/342
+        "no-undef": "off"
+      }
+    },
+    {
+      "files": ["*.vue"],
+      "rules": {
+        "vue/html-self-closing": [
+          "error",
+          {
+            "html": {
+              "void": "always",
+              "normal": "any",
+              "component": "always"
+            },
+            "svg": "always",
+            "math": "always"
+          }
+        ],
+        // allow TypeScript method signature overloading, see https://github.com/typescript-eslint/typescript-eslint/issues/291
+        "no-dupe-class-members": "off",
+        // disable no-undef rule for TypeScript, see https://github.com/typescript-eslint/typescript-eslint/issues/342
+        "no-undef": "off"
+      }
+    }
+  ]
 }
