@@ -3,7 +3,6 @@ import Yamaha from 'yamaha-nodejs';
 
 import { YamahaAPI } from './types';
 import { YamahaAVRAccessory } from './accessory';
-
 export class YamahaAVRPlatform implements IndependentPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
   public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
@@ -30,7 +29,7 @@ export class YamahaAVRPlatform implements IndependentPlatformPlugin {
         const features = systemConfig.YAMAHA_AV.System[0].Config[0].Feature_Existence[0];
 
         const device = {
-          UUID: this.api.hap.uuid.generate(`${config.systemId}_4`),
+          UUID: this.api.hap.uuid.generate(`${config.systemId}_${this.config.ip}`),
           displayName: this.config.name ? this.config.name : 'Yamaha AVR',
         };
 

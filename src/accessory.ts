@@ -59,10 +59,6 @@ export class YamahaAVRAccessory {
 
   async init() {
     try {
-      const path = this.platform.config.cacheDirectory || this.platform.api.user.storagePath() + '/.yamahaAVR/';
-
-      this.platform.log.info(path);
-
       await this.createTVService();
       await this.createTVSpeakerService();
       await this.createInputSourceServices();
@@ -218,7 +214,7 @@ export class YamahaAVRAccessory {
 
     return new Promise<void>((resolve, reject) => {
       this.state.inputs.forEach(async (input, i) => {
-        const cachedService = await this.storageService.getItem<CachedServiceData>(`input_${i}`);
+        const cachedService = await this.storageService.getItem<CachedServiceData>(input.id);
 
         try {
           const inputService = this.accessory.addService(
@@ -230,6 +226,7 @@ export class YamahaAVRAccessory {
           inputService
             .setCharacteristic(this.platform.Characteristic.Identifier, i)
             .setCharacteristic(this.platform.Characteristic.Name, input.name)
+            .setCharacteristic(this.platform.Characteristic.ConfiguredName, cachedService?.ConfiguredName || input.name)
             .setCharacteristic(
               this.platform.Characteristic.IsConfigured,
               this.platform.Characteristic.IsConfigured.CONFIGURED,
@@ -247,22 +244,31 @@ export class YamahaAVRAccessory {
               this.platform.Characteristic.InputDeviceType.TV,
             );
 
+          // Update input name cache
           inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).on('set', (name, callback) => {
             this.platform.log.debug(`Set input (${input.id}) name to ${name}`);
-            inputService.updateCharacteristic(this.platform.Characteristic.ConfiguredName, name);
 
-            if (cachedService?.ConfiguredName !== name) {
-              this.storageService.setItemSync(`input_${i}`, {
-                ConfiguredName: name,
-                CurrentVisibilityState: inputService.getCharacteristic(
-                  this.platform.Characteristic.CurrentVisibilityState,
-                ).value,
-              });
+            let configuredName = name;
+
+            if (!name || input.name === name) {
+              this.platform.log.debug(`Custom name not provided, clearing configured input name for`, input.name);
+
+              configuredName = input.name;
             }
+
+            inputService.updateCharacteristic(this.platform.Characteristic.ConfiguredName, configuredName);
+
+            this.storageService.setItemSync(input.id, {
+              ConfiguredName: configuredName,
+              CurrentVisibilityState: inputService.getCharacteristic(
+                this.platform.Characteristic.CurrentVisibilityState,
+              ).value,
+            });
 
             callback(null);
           });
 
+          // Update input visibility cache
           inputService
             .getCharacteristic(this.platform.Characteristic.TargetVisibilityState)
             .on('set', (targetVisibilityState, callback) => {
@@ -275,12 +281,11 @@ export class YamahaAVRAccessory {
                 targetVisibilityState,
               );
 
-              if (cachedService?.CurrentVisibilityState !== targetVisibilityState) {
-                this.storageService.setItemSync(`input_${i}`, {
-                  ConfiguredName: inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value,
-                  CurrentVisibilityState: targetVisibilityState,
-                });
-              }
+              this.storageService.setItemSync(input.id, {
+                ConfiguredName:
+                  inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value || input.name,
+                CurrentVisibilityState: targetVisibilityState,
+              });
 
               callback(null);
             });
@@ -298,7 +303,7 @@ export class YamahaAVRAccessory {
               );
             }
 
-            if (input.name !== cachedService.ConfiguredName) {
+            if (input.name !== cachedService.ConfiguredName && cachedService.ConfiguredName !== '') {
               this.platform.log.debug(`Restoring input ${input.id} configured name from cache`);
               inputService.setCharacteristic(this.platform.Characteristic.ConfiguredName, cachedService.ConfiguredName);
             }
@@ -309,11 +314,24 @@ export class YamahaAVRAccessory {
 
           try {
             // Cache Data
-            this.storageService.setItemSync(`input_${i}`, {
-              ConfiguredName: inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value,
-              CurrentVisibilityState: inputService.getCharacteristic(
-                this.platform.Characteristic.CurrentVisibilityState,
-              ).value,
+            const name =
+              inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value || input.name;
+            const visibility = inputService.getCharacteristic(
+              this.platform.Characteristic.CurrentVisibilityState,
+            ).value;
+
+            if (cachedService?.ConfiguredName === name && cachedService.CurrentVisibilityState === visibility) {
+              resolve();
+              return;
+            }
+
+            this.platform.log.debug(
+              `Cache input (${input.id}). Name: "${name}", Visibility: "${visibility ? 'HIDDEN' : 'SHOWN'}" `,
+            );
+
+            this.storageService.setItemSync(input.id, {
+              ConfiguredName: name,
+              CurrentVisibilityState: visibility,
             });
 
             if (this.inputServices.length === this.state.inputs.length) {
