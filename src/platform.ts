@@ -1,64 +1,53 @@
 import { API, IndependentPlatformPlugin, Logger, PlatformConfig, Service, Characteristic } from 'homebridge';
-import Yamaha from 'yamaha-nodejs';
+import fetch from 'node-fetch';
 
-import { YamahaAPI } from './types';
-import { AccessoryContext, YamahaAVRAccessory } from './accessory';
+import { YamahaAVRAccessory } from './accessory.js';
+import { AccessoryContext, DeviceInfo } from './types';
 
 export class YamahaAVRPlatform implements IndependentPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
   public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
-  public readonly YamahaAVR: YamahaAPI = new Yamaha(this.config.ip);
 
   constructor(public readonly log: Logger, public readonly config: PlatformConfig, public readonly api: API) {
     this.log.debug('Finished initializing platform:', this.config.name);
 
     this.api.on('didFinishLaunching', () => {
-      this.YamahaAVR.catchRequestErrors = false;
       this.discoverAVR();
     });
   }
 
-  discoverAVR() {
-    this.YamahaAVR.getSystemConfig()
-      .then((systemConfig) => {
-        const config = {
-          systemId: systemConfig.YAMAHA_AV.System[0].Config[0].System_ID[0],
-          modelName: systemConfig.YAMAHA_AV.System[0].Config[0].Model_Name[0],
-          firmwareVersion: systemConfig.YAMAHA_AV.System[0].Config[0].Version[0],
-        };
+  async discoverAVR() {
+    try {
+      const baseApiUrl = `http://${this.config.ip}/YamahaExtendedControl/v1`;
+      const deviceInfoResponse = await fetch(`${baseApiUrl}/system/getDeviceInfo`);
+      const deviceInfo = (await deviceInfoResponse.json()) as DeviceInfo;
 
-        const featuresXML = systemConfig.YAMAHA_AV.System[0].Config[0].Feature_Existence[0];
-        const features: string[] = [];
+      if (deviceInfo.response_code !== 0) {
+        throw new Error();
+      }
 
-        for (const feature in featuresXML) {
-          if (!feature.includes('Zone') && featuresXML[feature].includes('1')) {
-            features.push(feature);
-          }
-        }
+      const device: AccessoryContext['device'] = {
+        uuid: this.api.hap.uuid.generate(`${deviceInfo.system_id}_${this.config.ip}`),
+        displayName: this.config.name ?? `Yamaha ${deviceInfo.model_name}`,
+        modelName: deviceInfo.model_name,
+        systemId: deviceInfo.system_id,
+        firmwareVersion: deviceInfo.system_version,
+        baseApiUrl,
+      };
 
-        const device = {
-          UUID: this.api.hap.uuid.generate(`${config.systemId}_${this.config.ip}`),
-          displayName: this.config.name ? this.config.name : 'Yamaha AVR',
-        };
+      const accessory = new this.api.platformAccessory<AccessoryContext>(
+        device.displayName,
+        device.uuid,
+        this.api.hap.Categories.AUDIO_RECEIVER,
+      );
 
-        const accessory = new this.api.platformAccessory<AccessoryContext>(
-          device.displayName,
-          device.UUID,
-          this.api.hap.Categories.AUDIO_RECEIVER,
-        );
+      accessory.context = { device };
 
-        accessory.context = {
-          ...config,
-          features,
-          device,
-        };
-
-        new YamahaAVRAccessory(this, accessory);
-      })
-      .catch(() => {
-        this.log.error(`
-          Failed to get system config from ${this.config.name}. Please verify the AVR is connected and accessible at ${this.config.ip}
-        `);
-      });
+      new YamahaAVRAccessory(this, accessory);
+    } catch {
+      this.log.error(`
+        Failed to get system config from ${this.config.name}. Please verify the AVR is connected and accessible at ${this.config.ip}
+      `);
+    }
   }
 }

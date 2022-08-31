@@ -1,8 +1,8 @@
 import { API } from 'homebridge';
 
-import { PLATFORM_NAME } from './settings';
-import { YamahaAVRPlatform } from './platform';
+import { PLATFORM_NAME } from './settings.js';
+import { YamahaAVRPlatform } from './platform.js';
 
-export = (api: API) => {
+export default (api: API) => {
   api.registerPlatform(PLATFORM_NAME, YamahaAVRPlatform);
 };
