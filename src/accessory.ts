@@ -13,13 +13,23 @@ import { StorageService } from './storageService';
 interface Input {
   id: string;
   name: string;
-  index: number;
 }
 
 interface CachedServiceData {
   Identifier: number;
   CurrentVisibilityState: number;
   ConfiguredName: string;
+}
+
+export interface AccessoryContext {
+  systemId?: string;
+  modelName?: string;
+  firmwareVersion?: string;
+  device: {
+    UUID: string;
+    displayName: string;
+  };
+  features: string[];
 }
 
 export class YamahaAVRAccessory {
@@ -33,7 +43,10 @@ export class YamahaAVRAccessory {
     connectionError: false as boolean,
   };
 
-  constructor(private readonly platform: YamahaAVRPlatform, private readonly accessory: PlatformAccessory) {
+  constructor(
+    private readonly platform: YamahaAVRPlatform,
+    private readonly accessory: PlatformAccessory<AccessoryContext>,
+  ) {
     const cacheDirectory = this.platform.config.cacheDirectory || this.platform.api.user.storagePath() + '/.yamahaAVR/';
     this.storageService = new StorageService(cacheDirectory);
     this.storageService.initSync();
@@ -59,10 +72,6 @@ export class YamahaAVRAccessory {
 
   async init() {
     try {
-      const path = this.platform.config.cacheDirectory || this.platform.api.user.storagePath() + '/.yamahaAVR/';
-
-      this.platform.log.info(path);
-
       await this.createTVService();
       await this.createTVSpeakerService();
       await this.createInputSourceServices();
@@ -218,7 +227,7 @@ export class YamahaAVRAccessory {
 
     return new Promise<void>((resolve, reject) => {
       this.state.inputs.forEach(async (input, i) => {
-        const cachedService = await this.storageService.getItem<CachedServiceData>(`input_${i}`);
+        const cachedService = await this.storageService.getItem<CachedServiceData>(input.id);
 
         try {
           const inputService = this.accessory.addService(
@@ -230,6 +239,7 @@ export class YamahaAVRAccessory {
           inputService
             .setCharacteristic(this.platform.Characteristic.Identifier, i)
             .setCharacteristic(this.platform.Characteristic.Name, input.name)
+            .setCharacteristic(this.platform.Characteristic.ConfiguredName, cachedService?.ConfiguredName || input.name)
             .setCharacteristic(
               this.platform.Characteristic.IsConfigured,
               this.platform.Characteristic.IsConfigured.CONFIGURED,
@@ -247,22 +257,31 @@ export class YamahaAVRAccessory {
               this.platform.Characteristic.InputDeviceType.TV,
             );
 
+          // Update input name cache
           inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).on('set', (name, callback) => {
             this.platform.log.debug(`Set input (${input.id}) name to ${name}`);
-            inputService.updateCharacteristic(this.platform.Characteristic.ConfiguredName, name);
 
-            if (cachedService?.ConfiguredName !== name) {
-              this.storageService.setItemSync(`input_${i}`, {
-                ConfiguredName: name,
-                CurrentVisibilityState: inputService.getCharacteristic(
-                  this.platform.Characteristic.CurrentVisibilityState,
-                ).value,
-              });
+            let configuredName = name;
+
+            if (!name || input.name === name) {
+              this.platform.log.debug(`Custom name not provided, clearing configured input name for`, input.name);
+
+              configuredName = input.name;
             }
+
+            inputService.updateCharacteristic(this.platform.Characteristic.ConfiguredName, configuredName);
+
+            this.storageService.setItemSync(input.id, {
+              ConfiguredName: configuredName,
+              CurrentVisibilityState: inputService.getCharacteristic(
+                this.platform.Characteristic.CurrentVisibilityState,
+              ).value,
+            });
 
             callback(null);
           });
 
+          // Update input visibility cache
           inputService
             .getCharacteristic(this.platform.Characteristic.TargetVisibilityState)
             .on('set', (targetVisibilityState, callback) => {
@@ -275,12 +294,11 @@ export class YamahaAVRAccessory {
                 targetVisibilityState,
               );
 
-              if (cachedService?.CurrentVisibilityState !== targetVisibilityState) {
-                this.storageService.setItemSync(`input_${i}`, {
-                  ConfiguredName: inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value,
-                  CurrentVisibilityState: targetVisibilityState,
-                });
-              }
+              this.storageService.setItemSync(input.id, {
+                ConfiguredName:
+                  inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value || input.name,
+                CurrentVisibilityState: targetVisibilityState,
+              });
 
               callback(null);
             });
@@ -298,7 +316,7 @@ export class YamahaAVRAccessory {
               );
             }
 
-            if (input.name !== cachedService.ConfiguredName) {
+            if (input.name !== cachedService.ConfiguredName && cachedService.ConfiguredName !== '') {
               this.platform.log.debug(`Restoring input ${input.id} configured name from cache`);
               inputService.setCharacteristic(this.platform.Characteristic.ConfiguredName, cachedService.ConfiguredName);
             }
@@ -309,11 +327,24 @@ export class YamahaAVRAccessory {
 
           try {
             // Cache Data
-            this.storageService.setItemSync(`input_${i}`, {
-              ConfiguredName: inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value,
-              CurrentVisibilityState: inputService.getCharacteristic(
-                this.platform.Characteristic.CurrentVisibilityState,
-              ).value,
+            const name =
+              inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value || input.name;
+            const visibility = inputService.getCharacteristic(
+              this.platform.Characteristic.CurrentVisibilityState,
+            ).value;
+
+            if (cachedService?.ConfiguredName === name && cachedService.CurrentVisibilityState === visibility) {
+              resolve();
+              return;
+            }
+
+            this.platform.log.debug(
+              `Cache input (${input.id}). Name: "${name}", Visibility: "${visibility ? 'HIDDEN' : 'SHOWN'}" `,
+            );
+
+            this.storageService.setItemSync(input.id, {
+              ConfiguredName: name,
+              CurrentVisibilityState: visibility,
             });
 
             if (this.inputServices.length === this.state.inputs.length) {
@@ -338,69 +369,26 @@ export class YamahaAVRAccessory {
   }
 
   async updateInputSources() {
-    const featuresXML = this.accessory.context.features;
-    const features: string[] = [];
-
-    for (const prop in featuresXML) {
-      if (
-        !prop.includes('Zone') &&
-        featuresXML[prop].includes('1') &&
-        !prop.includes('USB') &&
-        !prop.includes('Tuner')
-      ) {
-        features.push(prop);
-      }
-    }
+    const features = this.accessory.context.features;
 
     return this.platform.YamahaAVR.getAvailableInputsWithNames()
       .then((availableInputs) => {
-        this.state.inputs = [];
+        this.platform.log.debug('features', features);
+        this.platform.log.debug('availableInputs', availableInputs);
 
-        features.forEach((feature, i) => {
-          if (
-            this.state.inputs.find(
-              (input) => input.id === feature.replace('_', ' ') || input.name === feature.replace('_', ' '),
-            )
-          ) {
-            // Input already exists
-            return;
-          }
+        const inputs = [
+          ...features,
+          ...Object.keys(availableInputs[0]).filter(
+            (input) => !features.map((feature) => feature.toUpperCase()).includes(input.toUpperCase()),
+          ),
+        ].map((input) => ({
+          id: input.replace('_', ''),
+          name: (availableInputs[0][input] ? availableInputs[0][input][0] : input).replace('_', ' '),
+        }));
 
-          this.state.inputs.push({
-            id: feature.replace('_', ' '),
-            name: feature.replace('_', ' '),
-            index: i,
-          });
-        });
+        this.platform.log.debug('inputs', inputs);
 
-        // use index from the array that is filled by features
-        let i = this.state.inputs.length;
-
-        for (const key in availableInputs[0]) {
-          // check if the property/key is defined in the object itself, not in parent
-          if (Object.prototype.hasOwnProperty.call(availableInputs[0], key)) {
-            // eslint-disable-line
-            let id = String(key).replace('_', '');
-            const name = availableInputs[0][key][0];
-
-            if (key.includes('MusicCast_Link') || key.includes('NET_RADIO')) {
-              id = String(key).replace('_', ' ');
-            }
-
-            if (this.state.inputs.find((input) => input.id === id || input.name === name)) {
-              // Input already exists
-              return;
-            }
-
-            this.state.inputs.push({
-              id,
-              name,
-              index: i,
-            });
-
-            i++;
-          }
-        }
+        this.state.inputs = inputs;
 
         return;
       })
@@ -421,10 +409,15 @@ export class YamahaAVRAccessory {
       .then(async (basicInfo) => {
         await this.updateInputSources();
 
-        this.service.updateCharacteristic(
-          this.platform.Characteristic.ActiveIdentifier,
-          this.state.inputs.findIndex((input) => input.id === basicInfo.getCurrentInput()),
+        const currentInputIndex = this.state.inputs.findIndex(
+          (input) => input.id === basicInfo.getCurrentInput().replace(/[^a-z0-9]/gi, ''),
         );
+
+        if (currentInputIndex > -1) {
+          this.service.updateCharacteristic(this.platform.Characteristic.ActiveIdentifier, currentInputIndex);
+        } else {
+          this.platform.log.error(`Unexpected input: "${basicInfo.getCurrentInput()}"`, this.state.inputs);
+        }
 
         if (this.state.connectionError) {
           this.state.connectionError = false;

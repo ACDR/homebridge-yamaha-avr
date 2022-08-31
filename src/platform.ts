@@ -2,7 +2,7 @@ import { API, IndependentPlatformPlugin, Logger, PlatformConfig, Service, Charac
 import Yamaha from 'yamaha-nodejs';
 
 import { YamahaAPI } from './types';
-import { YamahaAVRAccessory } from './accessory';
+import { AccessoryContext, YamahaAVRAccessory } from './accessory';
 
 export class YamahaAVRPlatform implements IndependentPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
@@ -27,14 +27,21 @@ export class YamahaAVRPlatform implements IndependentPlatformPlugin {
           firmwareVersion: systemConfig.YAMAHA_AV.System[0].Config[0].Version[0],
         };
 
-        const features = systemConfig.YAMAHA_AV.System[0].Config[0].Feature_Existence[0];
+        const featuresXML = systemConfig.YAMAHA_AV.System[0].Config[0].Feature_Existence[0];
+        const features: string[] = [];
+
+        for (const feature in featuresXML) {
+          if (!feature.includes('Zone') && featuresXML[feature].includes('1')) {
+            features.push(feature);
+          }
+        }
 
         const device = {
-          UUID: this.api.hap.uuid.generate(`${config.systemId}_4`),
+          UUID: this.api.hap.uuid.generate(`${config.systemId}_${this.config.ip}`),
           displayName: this.config.name ? this.config.name : 'Yamaha AVR',
         };
 
-        const accessory = new this.api.platformAccessory(
+        const accessory = new this.api.platformAccessory<AccessoryContext>(
           device.displayName,
           device.UUID,
           this.api.hap.Categories.AUDIO_RECEIVER,

@@ -7,11 +7,15 @@ export interface YamahaAPI {
     YAMAHA_AV: {
       System: {
         Config: {
-          Name: string[];
           Model_Name: string[];
           System_ID: string[];
           Version: string[];
-          Feature_Existence: string[];
+          Feature_Existence: {
+            [key: string]: string[];
+          }[];
+          Name: {
+            Input: string[];
+          };
         }[];
       }[];
     };
@@ -21,7 +25,7 @@ export interface YamahaAPI {
     {
       id: string;
       name: string;
-    }[]
+    }[][]
   >;
   isOn: () => Promise<boolean>;
   powerOn: () => Promise<string>;
