@@ -410,7 +410,12 @@ export class YamahaAVRAccessory {
         await this.updateInputSources();
 
         const currentInputIndex = this.state.inputs.findIndex(
-          (input) => input.id === basicInfo.getCurrentInput().replace(/[^a-z0-9]/gi, ''),
+          (input) =>
+            input.id.toUpperCase() ===
+            basicInfo
+              .getCurrentInput()
+              .replace(/[^a-z0-9]/gi, '')
+              .toUpperCase(),
         );
 
         if (currentInputIndex > -1) {
