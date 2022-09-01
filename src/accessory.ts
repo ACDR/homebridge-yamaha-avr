@@ -392,7 +392,7 @@ export class YamahaAVRAccessory {
       const getNameTextResponse = await fetch(`${this.baseApiUrl}/system/getNameText`);
       const nameText = (await getNameTextResponse.json()) as NameText;
       const inputList = nameText.input_list;
-      this.state.inputs = inputList;
+      this.state.inputs = inputList.filter((input) => input.id !== 'main_sync' && input.id !== 'none');
     } catch {
       this.platform.log.error(`
       Failed to get available inputs from ${this.platform.config.name}.
