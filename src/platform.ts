@@ -2,7 +2,7 @@ import { API, IndependentPlatformPlugin, Logger, PlatformConfig, Service, Charac
 import fetch from 'node-fetch';
 
 import { YamahaAVRAccessory } from './accessory.js';
-import { AccessoryContext, DeviceInfo } from './types';
+import { AccessoryContext, DeviceInfo } from './types.js';
 
 export class YamahaAVRPlatform implements IndependentPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
@@ -27,7 +27,7 @@ export class YamahaAVRPlatform implements IndependentPlatformPlugin {
       }
 
       const device: AccessoryContext['device'] = {
-        uuid: this.api.hap.uuid.generate(`${deviceInfo.system_id}_${this.config.ip}`),
+        uuid: this.api.hap.uuid.generate(`${deviceInfo.system_id}_${this.config.ip}_1`),
         displayName: this.config.name ?? `Yamaha ${deviceInfo.model_name}`,
         modelName: deviceInfo.model_name,
         systemId: deviceInfo.system_id,

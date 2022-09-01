@@ -10,7 +10,7 @@ import fetch, { Response } from 'node-fetch';
 import { PLUGIN_NAME } from './settings.js';
 import { YamahaAVRPlatform } from './platform.js';
 import { StorageService } from './storageService.js';
-import { AccessoryContext, BaseResponse, Cursor, Input, MainZoneRemoteCode, NameText, ZoneStatus } from './types';
+import { AccessoryContext, BaseResponse, Cursor, Input, MainZoneRemoteCode, NameText, ZoneStatus } from './types.js';
 
 interface CachedServiceData {
   Identifier: number;
@@ -263,15 +263,18 @@ export class YamahaAVRAccessory {
 
           // Update input name cache
           inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).on('set', (name, callback) => {
-            this.platform.log.debug(`Set input (${input.id}) name to ${name}`);
+            const currentConfiguredName = inputService.getCharacteristic(
+              this.platform.Characteristic.ConfiguredName,
+            ).value;
 
-            let configuredName = name;
-
-            if (!name || input.text === name) {
-              this.platform.log.debug(`Custom name not provided, clearing configured input name for`, input.text);
-
-              configuredName = input.text;
+            if (name === currentConfiguredName) {
+              callback(null);
+              return;
             }
+
+            this.platform.log.debug(`Set input (${input.id}) name to ${name} `);
+
+            const configuredName = name || input.text;
 
             inputService.updateCharacteristic(this.platform.Characteristic.ConfiguredName, configuredName);
 
@@ -289,6 +292,15 @@ export class YamahaAVRAccessory {
           inputService
             .getCharacteristic(this.platform.Characteristic.TargetVisibilityState)
             .on('set', (targetVisibilityState, callback) => {
+              const currentVisbility = inputService.getCharacteristic(
+                this.platform.Characteristic.CurrentVisibilityState,
+              ).value;
+
+              if (targetVisibilityState === currentVisbility) {
+                callback(null);
+                return;
+              }
+
               const isHidden = targetVisibilityState === this.platform.Characteristic.TargetVisibilityState.HIDDEN;
 
               this.platform.log.debug(`Set input (${input.id}) visibility state to ${isHidden ? 'HIDDEN' : 'SHOWN'} `);
@@ -314,6 +326,7 @@ export class YamahaAVRAccessory {
           if (cachedService) {
             if (this.platform.Characteristic.CurrentVisibilityState.SHOWN !== cachedService.CurrentVisibilityState) {
               this.platform.log.debug(`Restoring input ${input.id} visibility state from cache`);
+
               inputService.setCharacteristic(
                 this.platform.Characteristic.CurrentVisibilityState,
                 cachedService.CurrentVisibilityState,
@@ -392,12 +405,13 @@ export class YamahaAVRAccessory {
     try {
       const zoneStatusResponse = await fetch(`${this.baseApiUrl}/main/getStatus`);
       const zoneStatus = (await zoneStatusResponse.json()) as ZoneStatus;
+      this.platform.log.debug(`AVR PING`, { power: zoneStatus.power, input: zoneStatus.input });
 
       this.service.updateCharacteristic(this.platform.Characteristic.Active, zoneStatus.power === 'on');
-      this.service.updateCharacteristic(
-        this.platform.Characteristic.ActiveIdentifier,
-        this.state.inputs.findIndex((input) => input.id === zoneStatus.input),
-      );
+      // this.service.updateCharacteristic(
+      //   this.platform.Characteristic.ActiveIdentifier,
+      //   this.state.inputs.findIndex((input) => input.id === zoneStatus.input),
+      // );
 
       if (this.state.connectionError) {
         this.state.connectionError = false;
@@ -497,6 +511,8 @@ export class YamahaAVRAccessory {
         throw new Error('Failed to fetch zone power status');
       }
 
+      this.platform.log.info(`Current input: ${zoneStatus.input}`);
+
       callback(
         null,
         this.state.inputs.findIndex((input) => input.id === zoneStatus.input),
@@ -506,9 +522,15 @@ export class YamahaAVRAccessory {
     }
   }
 
-  async setInputState(inputId: CharacteristicValue, callback: CharacteristicSetCallback) {
+  async setInputState(inputIndex: CharacteristicValue, callback: CharacteristicSetCallback) {
     try {
-      const setInputResponse = await fetch(`${this.baseApiUrl}/main/setInput?input=${inputId}`);
+      if (typeof inputIndex !== 'number') {
+        callback(null);
+        return;
+      }
+
+      this.platform.log.info(`Set input: ${this.state.inputs[inputIndex].id}`);
+      const setInputResponse = await fetch(`${this.baseApiUrl}/main/setInput?input=${this.state.inputs[inputIndex]}`);
       const responseJson = (await setInputResponse.json()) as BaseResponse;
 
       if (responseJson.response_code !== 0) {
