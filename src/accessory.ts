@@ -193,7 +193,8 @@ export class YamahaAVRAccessory {
 
         case this.platform.Characteristic.RemoteKey.INFORMATION:
           this.platform.log.info('set Remote Key Pressed: INFORMATION');
-          sendRemoteCode(MainZoneRemoteCode.INFORMATION, callback);
+          // We'll use the info button to flick through inputs
+          sendRemoteCode(MainZoneRemoteCode.INPUT_FWD, callback);
           break;
 
         default:

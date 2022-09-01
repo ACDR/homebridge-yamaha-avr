@@ -223,9 +223,11 @@ export enum MainZoneRemoteCode {
   STOP = '7F016996',
   PAUSE = '7F016798',
   SEARCH_BACK = '7F016A95',
-  SEARCH_FWD = '7F016E94',
+  SEARCH_FWD = '7F016B94',
   SKIP_BACK = '7F016C93',
   SKIP_FWD = '7F016D92',
+  INPUT_BACK = '7A85235C',
+  INPUT_FWD = '7A851F60',
   FM = '7F015827',
   AM = '7F01552A',
 
@@ -241,7 +243,6 @@ export enum MainZoneRemoteCode {
   OPTION = '7A856B14',
   TOP_MENU = '7A85A0DF',
   POP_UP_MENU = '7A85A4DB',
-  INFORMATION = '7A851F60',
 }
 
 export enum Zone2RemoteCode {
