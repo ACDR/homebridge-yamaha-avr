@@ -483,22 +483,25 @@ export class YamahaAVRAccessory {
 
   getInputState(callback: CharacteristicGetCallback) {
     this.platform.YamahaAVR.getBasicInfo().then((basicInfo) => {
-      const input: Input | undefined = this.state.inputs.find((input) => input.id === basicInfo.getCurrentInput());
+      const currentInput = basicInfo.getCurrentInput().replace(/[^a-z0-9]/gi, '');
 
-      this.platform.log.debug(`Current input: ${basicInfo.getCurrentInput()}`);
+      const input = this.state.inputs.find((input) => input.id === currentInput);
+
+      this.platform.log.debug(`Current input: ${currentInput}`);
 
       if (!input) {
+        callback(null);
         return;
       }
 
       this.platform.log.info(`Current input: ${input.name} (${input.id})`);
 
       this.state.inputs.filter((input, index) => {
-        if (input.id === basicInfo.getCurrentInput()) {
+        if (input.id !== currentInput) {
           return callback(null, index);
         }
 
-        return;
+        return callback(null);
       });
     });
   }
