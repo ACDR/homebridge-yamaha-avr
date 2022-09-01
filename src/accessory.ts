@@ -10,7 +10,7 @@ import fetch, { Response } from 'node-fetch';
 import { PLUGIN_NAME } from './settings.js';
 import { YamahaAVRPlatform } from './platform.js';
 import { StorageService } from './storageService.js';
-import { AccessoryContext, BaseResponse, Input, NameText, ZoneStatus } from './types';
+import { AccessoryContext, BaseResponse, Cursor, Input, MainZoneRemoteCode, NameText, ZoneStatus } from './types';
 
 interface CachedServiceData {
   Identifier: number;
@@ -99,8 +99,18 @@ export class YamahaAVRAccessory {
 
     // Remote Key Set
     this.service.getCharacteristic(this.platform.Characteristic.RemoteKey).on('set', (remoteKey, callback) => {
-      const sendRemoteCode = async (remoteKey: string, callback?: CharacteristicSetCallback) => {
+      const sendRemoteCode = async (remoteKey: MainZoneRemoteCode, callback?: CharacteristicSetCallback) => {
         await fetch(`${this.baseApiUrl}/system/sendIrCode?code=${remoteKey}`);
+
+        if (!callback) {
+          return;
+        }
+
+        callback();
+      };
+
+      const controlCursor = async (cursor: Cursor, callback?: CharacteristicSetCallback) => {
+        await fetch(`${this.baseApiUrl}/main/controlCursor?cursor=${cursor}`);
 
         if (!callback) {
           return;
@@ -112,67 +122,67 @@ export class YamahaAVRAccessory {
       switch (remoteKey) {
         case this.platform.Characteristic.RemoteKey.REWIND:
           this.platform.log.info('set Remote Key Pressed: REWIND');
-          // this.platform.YamahaAVR.rewind();
+          sendRemoteCode(MainZoneRemoteCode.SEARCH_BACK, callback);
           callback();
           break;
 
         case this.platform.Characteristic.RemoteKey.FAST_FORWARD:
           this.platform.log.info('set Remote Key Pressed: FAST_FORWARD');
-          // this.platform.YamahaAVR.skip();
+          sendRemoteCode(MainZoneRemoteCode.SEARCH_FWD, callback);
           callback();
           break;
 
         case this.platform.Characteristic.RemoteKey.NEXT_TRACK:
           this.platform.log.info('set Remote Key Pressed: NEXT_TRACK');
-          sendRemoteCode('7F016D92', callback);
+          sendRemoteCode(MainZoneRemoteCode.SKIP_FWD, callback);
           break;
 
         case this.platform.Characteristic.RemoteKey.PREVIOUS_TRACK:
           this.platform.log.info('set Remote Key Pressed: PREVIOUS_TRACK');
-          sendRemoteCode('7F016C93', callback);
+          sendRemoteCode(MainZoneRemoteCode.SKIP_BACK, callback);
           break;
 
         case this.platform.Characteristic.RemoteKey.ARROW_UP:
           this.platform.log.info('set Remote Key Pressed: ARROW_UP');
-          sendRemoteCode('7A859D62', callback);
+          controlCursor('up', callback);
           break;
 
         case this.platform.Characteristic.RemoteKey.ARROW_DOWN:
           this.platform.log.info('set Remote Key Pressed: ARROW_DOWN');
-          sendRemoteCode('7A859C63', callback);
+          controlCursor('down', callback);
           break;
 
         case this.platform.Characteristic.RemoteKey.ARROW_LEFT:
           this.platform.log.info('set Remote Key Pressed: ARROW_LEFT');
-          sendRemoteCode('7A859F60', callback);
+          controlCursor('left', callback);
           break;
 
         case this.platform.Characteristic.RemoteKey.ARROW_RIGHT:
           this.platform.log.info('set Remote Key Pressed: ARROW_RIGHT');
-          sendRemoteCode('7A859E61', callback);
+          controlCursor('right', callback);
           break;
 
         case this.platform.Characteristic.RemoteKey.SELECT:
           this.platform.log.info('set Remote Key Pressed: SELECT');
-          sendRemoteCode('7A85DE21', callback);
+          controlCursor('select', callback);
           break;
 
         case this.platform.Characteristic.RemoteKey.BACK:
           this.platform.log.info('set Remote Key Pressed: BACK');
-          sendRemoteCode('7A85AA55', callback);
+          controlCursor('return', callback);
           break;
 
         case this.platform.Characteristic.RemoteKey.EXIT:
           this.platform.log.info('set Remote Key Pressed: EXIT');
-          sendRemoteCode('7A85AA55', callback);
+          sendRemoteCode(MainZoneRemoteCode.TOP_MENU, callback);
           break;
 
         case this.platform.Characteristic.RemoteKey.PLAY_PAUSE:
           this.platform.log.info('set Remote Key Pressed: PLAY_PAUSE');
           if (this.state.isPlaying) {
-            sendRemoteCode('7F016798');
+            sendRemoteCode(MainZoneRemoteCode.PAUSE);
           } else {
-            sendRemoteCode('7F016897');
+            sendRemoteCode(MainZoneRemoteCode.PLAY);
           }
 
           this.state.isPlaying = !this.state.isPlaying;
@@ -183,7 +193,7 @@ export class YamahaAVRAccessory {
 
         case this.platform.Characteristic.RemoteKey.INFORMATION:
           this.platform.log.info('set Remote Key Pressed: INFORMATION');
-          sendRemoteCode('7A851F60', callback);
+          sendRemoteCode(MainZoneRemoteCode.INFORMATION, callback);
           break;
 
         default:

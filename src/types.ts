@@ -200,3 +200,84 @@ export interface AccessoryContext {
     baseApiUrl: string;
   };
 }
+
+export type Cursor = 'up' | 'down' | 'left' | 'right' | 'select' | 'return';
+
+export enum MainZoneRemoteCode {
+  // numeric codes
+  NUM_1 = '7F0151AE',
+  NUM_2 = '7F0152AD',
+  NUM_3 = '7F0153AC',
+  NUM_4 = '7F0154AB',
+  NUM_5 = '7F0155AA',
+  NUM_6 = '7F0156A9',
+  NUM_7 = '7F0157A8',
+  NUM_8 = '7F0158A7',
+  NUM_9 = '7F0159A6',
+  NUM_0 = '7F015AA5',
+  NUM_10_PLUS = '7F015BA4',
+  ENT = '7F015CA3',
+
+  // operations codes
+  PLAY = '7F016897',
+  STOP = '7F016996',
+  PAUSE = '7F016798',
+  SEARCH_BACK = '7F016A95',
+  SEARCH_FWD = '7F016E94',
+  SKIP_BACK = '7F016C93',
+  SKIP_FWD = '7F016D92',
+  FM = '7F015827',
+  AM = '7F01552A',
+
+  // cursor codes
+  UP = '7A859D62',
+  DOWN = '7A859C63',
+  LEFT = '7A859F60',
+  RIGHT = '7A859E61',
+  ENTER = '7A85DE21',
+  RETURN = '7A85AA55',
+  LEVEL = '7A858679',
+  ON_SCREEN = '7A85847B',
+  OPTION = '7A856B14',
+  TOP_MENU = '7A85A0DF',
+  POP_UP_MENU = '7A85A4DB',
+  INFORMATION = '7A851F60',
+}
+
+export enum Zone2RemoteCode {
+  // numeric codes
+  NUM_1 = '7F01718F',
+  NUM_2 = '7F01728C',
+  NUM_3 = '7F01738D',
+  NUM_4 = '7F01748A',
+  NUM_5 = '7F01758B',
+  NUM_6 = '7F017688',
+  NUM_7 = '7F017789',
+  NUM_8 = '7F017886',
+  NUM_9 = '7F017986',
+  NUM_0 = '7F017A84',
+  NUM_10_PLUS = '7F017B85',
+  ENT = '7F017C82',
+
+  // operations codes
+  PLAY = '7F018876',
+  STOP = '7F018977',
+  PAUSE = '7F018779',
+  SEARCH_BACK = '7F018A74',
+  SEARCH_FWD = '7F018B75',
+  SKIP_BACK = '7F018C72',
+  SKIP_FWD = '7F018D73',
+  FM = '7F015927',
+  AM = '7F015628',
+
+  // cursor codes
+  UP = '7A852B55',
+  DOWN = '7A852C52',
+  LEFT = '7A852D53',
+  RIGHT = '7A852E50',
+  ENTER = '7A852F51',
+  RETURN = '7A853C42',
+  OPTION = '7A856C12',
+  TOP_MENU = '7A85A1DF',
+  POP_UP_MENU = '7A85A5DB',
+}
