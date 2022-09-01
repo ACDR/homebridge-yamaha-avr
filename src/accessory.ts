@@ -408,10 +408,11 @@ export class YamahaAVRAccessory {
       this.platform.log.debug(`AVR PING`, { power: zoneStatus.power, input: zoneStatus.input });
 
       this.service.updateCharacteristic(this.platform.Characteristic.Active, zoneStatus.power === 'on');
-      // this.service.updateCharacteristic(
-      //   this.platform.Characteristic.ActiveIdentifier,
-      //   this.state.inputs.findIndex((input) => input.id === zoneStatus.input),
-      // );
+
+      this.service.updateCharacteristic(
+        this.platform.Characteristic.ActiveIdentifier,
+        this.state.inputs.findIndex((input) => input.id === zoneStatus.input),
+      );
 
       if (this.state.connectionError) {
         this.state.connectionError = false;
@@ -441,6 +442,7 @@ export class YamahaAVRAccessory {
 
       callback(null, zoneStatus.power === 'on');
     } catch (error) {
+      this.platform.log.error((error as Error).message);
       callback(error as Error, false);
     }
   }
@@ -465,6 +467,7 @@ export class YamahaAVRAccessory {
 
       callback(null);
     } catch (error) {
+      this.platform.log.error((error as Error).message);
       callback(error as Error, false);
     }
   }
@@ -498,6 +501,7 @@ export class YamahaAVRAccessory {
 
       callback(null);
     } catch (error) {
+      this.platform.log.error((error as Error).message);
       callback(error as Error, false);
     }
   }
@@ -518,6 +522,7 @@ export class YamahaAVRAccessory {
         this.state.inputs.findIndex((input) => input.id === zoneStatus.input),
       );
     } catch (error) {
+      this.platform.log.error((error as Error).message);
       callback(error as Error, false);
     }
   }
@@ -529,16 +534,20 @@ export class YamahaAVRAccessory {
         return;
       }
 
-      this.platform.log.info(`Set input: ${this.state.inputs[inputIndex].id}`);
-      const setInputResponse = await fetch(`${this.baseApiUrl}/main/setInput?input=${this.state.inputs[inputIndex]}`);
+      const setInputResponse = await fetch(
+        `${this.baseApiUrl}/main/setInput?input=${this.state.inputs[inputIndex].id}`,
+      );
       const responseJson = (await setInputResponse.json()) as BaseResponse;
 
       if (responseJson.response_code !== 0) {
         throw new Error('Failed to set zone input');
       }
 
+      this.platform.log.info(`Set input: ${this.state.inputs[inputIndex].id}`);
+
       callback(null);
     } catch (error) {
+      this.platform.log.error((error as Error).message);
       callback(error as Error, false);
     }
   }
