@@ -405,6 +405,11 @@ export class YamahaAVRAccessory {
     try {
       const zoneStatusResponse = await fetch(`${this.baseApiUrl}/main/getStatus`);
       const zoneStatus = (await zoneStatusResponse.json()) as ZoneStatus;
+
+      if (zoneStatus.response_code !== 0) {
+        throw new Error('Failed to fetch zone power status');
+      }
+
       this.platform.log.debug(`AVR PING`, { power: zoneStatus.power, input: zoneStatus.input });
 
       this.service.updateCharacteristic(this.platform.Characteristic.Active, zoneStatus.power === 'on');
@@ -418,7 +423,7 @@ export class YamahaAVRAccessory {
         this.state.connectionError = false;
         this.platform.log.info(`Communication with Yamaha AVR at ${this.platform.config.ip} restored`);
       }
-    } catch {
+    } catch (error) {
       if (this.state.connectionError) {
         return;
       }
