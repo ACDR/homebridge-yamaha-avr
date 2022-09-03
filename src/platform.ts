@@ -25,6 +25,11 @@ export class YamahaAVRPlatform implements IndependentPlatformPlugin {
     this.log.debug('Finished initializing platform:', this.config.name);
 
     this.api.on('didFinishLaunching', () => {
+      if (!this.config.ip) {
+        this.log.error('IP address has not been set.');
+        return;
+      }
+
       this.discoverAVR();
     });
   }
