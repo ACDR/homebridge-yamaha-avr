@@ -159,6 +159,7 @@ export class YamahaAVRAccessory {
           // Update input name cache
           inputService
             .getCharacteristic(this.platform.Characteristic.ConfiguredName)
+            .onGet((): CharacteristicValue => cachedService?.ConfiguredName || input.text)
             .onSet((name: CharacteristicValue) => {
               const currentConfiguredName = inputService.getCharacteristic(
                 this.platform.Characteristic.ConfiguredName,
@@ -185,6 +186,7 @@ export class YamahaAVRAccessory {
           // Update input visibility cache
           inputService
             .getCharacteristic(this.platform.Characteristic.TargetVisibilityState)
+            .onGet((): CharacteristicValue => cachedService?.CurrentVisibilityState || 0)
             .onSet((targetVisibilityState: CharacteristicValue) => {
               const currentVisbility = inputService.getCharacteristic(
                 this.platform.Characteristic.CurrentVisibilityState,
