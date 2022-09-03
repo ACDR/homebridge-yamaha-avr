@@ -27,6 +27,9 @@ npm install -g homebridge-yamaha-avr
 
 - Quickly switch input using the information (i) button in the Control Centre remote
 - Adjust the volume using the physical volume buttons on your iOS device whilst the Control Centre remote is open
+- Enable additional zones
+- Enable Fan devices to control the volume of each enabled zone
+- Enable Switch device to enable/disable Pure Direct
 
 ## Configuration
 
@@ -43,7 +46,12 @@ Example configuration:
         "platform": "yamaha-avr",
         "name": "Yamaha RX-V685",
         "ip": "192.168.1.12",
-        "cacheDirectory": ""
+        "cacheDirectory": "",
+        "enablePureDirectSwitch": true,
+        "volumeAccessoryEnabled": true,
+        "zone2Enabled": true,
+        "zone3Enabled": false,
+        "zone4Enabled": false,
       }
     ]
 }
