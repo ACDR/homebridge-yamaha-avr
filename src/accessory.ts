@@ -1,10 +1,4 @@
-import {
-  Service,
-  PlatformAccessory,
-  CharacteristicValue,
-  CharacteristicSetCallback,
-  CharacteristicGetCallback,
-} from 'homebridge';
+import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 import fetch, { Response } from 'node-fetch';
 
 import { YamahaAVRPlatform } from './platform.js';
@@ -96,120 +90,17 @@ export class YamahaAVRAccessory {
     // Power State Get/Set
     this.service
       .getCharacteristic(this.platform.Characteristic.Active)
-      .on('get', this.getPowerState.bind(this))
-      .on('set', this.setPowerState.bind(this));
+      .onSet(this.setPowerState.bind(this))
+      .onGet(this.getPowerState.bind(this));
 
     // Input Source Get/Set
     this.service
       .getCharacteristic(this.platform.Characteristic.ActiveIdentifier)
-      .on('get', this.getInputState.bind(this))
-      .on('set', this.setInputState.bind(this));
+      .onSet(this.setInputState.bind(this))
+      .onGet(this.getInputState.bind(this));
 
     // Remote Key Set
-    this.service.getCharacteristic(this.platform.Characteristic.RemoteKey).on('set', (remoteKey, callback) => {
-      const sendRemoteCode = async (remoteKey: MainZoneRemoteCode, callback?: CharacteristicSetCallback) => {
-        await fetch(`${this.baseApiUrl}/system/sendIrCode?code=${remoteKey}`);
-
-        if (!callback) {
-          return;
-        }
-
-        callback();
-      };
-
-      const controlCursor = async (cursor: Cursor, callback?: CharacteristicSetCallback) => {
-        await fetch(`${this.baseApiUrl}/${this.zone}/controlCursor?cursor=${cursor}`);
-
-        if (!callback) {
-          return;
-        }
-
-        callback();
-      };
-
-      switch (remoteKey) {
-        case this.platform.Characteristic.RemoteKey.REWIND:
-          this.platform.log.info('set Remote Key Pressed: REWIND');
-          sendRemoteCode(MainZoneRemoteCode.SEARCH_BACK, callback);
-          callback();
-          break;
-
-        case this.platform.Characteristic.RemoteKey.FAST_FORWARD:
-          this.platform.log.info('set Remote Key Pressed: FAST_FORWARD');
-          sendRemoteCode(MainZoneRemoteCode.SEARCH_FWD, callback);
-          callback();
-          break;
-
-        case this.platform.Characteristic.RemoteKey.NEXT_TRACK:
-          this.platform.log.info('set Remote Key Pressed: NEXT_TRACK');
-          sendRemoteCode(MainZoneRemoteCode.SKIP_FWD, callback);
-          break;
-
-        case this.platform.Characteristic.RemoteKey.PREVIOUS_TRACK:
-          this.platform.log.info('set Remote Key Pressed: PREVIOUS_TRACK');
-          sendRemoteCode(MainZoneRemoteCode.SKIP_BACK, callback);
-          break;
-
-        case this.platform.Characteristic.RemoteKey.ARROW_UP:
-          this.platform.log.info('set Remote Key Pressed: ARROW_UP');
-          controlCursor('up', callback);
-          break;
-
-        case this.platform.Characteristic.RemoteKey.ARROW_DOWN:
-          this.platform.log.info('set Remote Key Pressed: ARROW_DOWN');
-          controlCursor('down', callback);
-          break;
-
-        case this.platform.Characteristic.RemoteKey.ARROW_LEFT:
-          this.platform.log.info('set Remote Key Pressed: ARROW_LEFT');
-          controlCursor('left', callback);
-          break;
-
-        case this.platform.Characteristic.RemoteKey.ARROW_RIGHT:
-          this.platform.log.info('set Remote Key Pressed: ARROW_RIGHT');
-          controlCursor('right', callback);
-          break;
-
-        case this.platform.Characteristic.RemoteKey.SELECT:
-          this.platform.log.info('set Remote Key Pressed: SELECT');
-          controlCursor('select', callback);
-          break;
-
-        case this.platform.Characteristic.RemoteKey.BACK:
-          this.platform.log.info('set Remote Key Pressed: BACK');
-          controlCursor('return', callback);
-          break;
-
-        case this.platform.Characteristic.RemoteKey.EXIT:
-          this.platform.log.info('set Remote Key Pressed: EXIT');
-          sendRemoteCode(MainZoneRemoteCode.TOP_MENU, callback);
-          break;
-
-        case this.platform.Characteristic.RemoteKey.PLAY_PAUSE:
-          this.platform.log.info('set Remote Key Pressed: PLAY_PAUSE');
-          if (this.state.isPlaying) {
-            sendRemoteCode(MainZoneRemoteCode.PAUSE);
-          } else {
-            sendRemoteCode(MainZoneRemoteCode.PLAY);
-          }
-
-          this.state.isPlaying = !this.state.isPlaying;
-
-          callback();
-
-          break;
-
-        case this.platform.Characteristic.RemoteKey.INFORMATION:
-          this.platform.log.info('set Remote Key Pressed: INFORMATION');
-          // We'll use the info button to flick through inputs
-          sendRemoteCode(MainZoneRemoteCode.INPUT_FWD, callback);
-          break;
-
-        default:
-          this.platform.log.info('unhandled Remote Key Pressed');
-          break;
-      }
-    });
+    this.service.getCharacteristic(this.platform.Characteristic.RemoteKey).onSet(this.setRemoteKey.bind(this));
 
     return;
   }
@@ -225,11 +116,7 @@ export class YamahaAVRAccessory {
       );
 
     // handle volume control
-    speakerService
-      .getCharacteristic(this.platform.Characteristic.VolumeSelector)
-      .on('set', (direction: CharacteristicValue, callback: CharacteristicSetCallback) => {
-        this.setVolume(direction, callback);
-      });
+    speakerService.getCharacteristic(this.platform.Characteristic.VolumeSelector).onSet(this.setVolume.bind(this));
 
     return;
   }
@@ -270,42 +157,40 @@ export class YamahaAVRAccessory {
             );
 
           // Update input name cache
-          inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).on('set', (name, callback) => {
-            const currentConfiguredName = inputService.getCharacteristic(
-              this.platform.Characteristic.ConfiguredName,
-            ).value;
+          inputService
+            .getCharacteristic(this.platform.Characteristic.ConfiguredName)
+            .onSet((name: CharacteristicValue) => {
+              const currentConfiguredName = inputService.getCharacteristic(
+                this.platform.Characteristic.ConfiguredName,
+              ).value;
 
-            if (name === currentConfiguredName) {
-              callback(null);
-              return;
-            }
+              if (name === currentConfiguredName) {
+                return;
+              }
 
-            this.platform.log.debug(`Set input (${input.id}) name to ${name} `);
+              this.platform.log.debug(`Set input (${input.id}) name to ${name} `);
 
-            const configuredName = name || input.text;
+              const configuredName = name || input.text;
 
-            inputService.updateCharacteristic(this.platform.Characteristic.ConfiguredName, configuredName);
+              inputService.updateCharacteristic(this.platform.Characteristic.ConfiguredName, configuredName);
 
-            this.storageService.setItemSync(input.id, {
-              ConfiguredName: configuredName,
-              CurrentVisibilityState: inputService.getCharacteristic(
-                this.platform.Characteristic.CurrentVisibilityState,
-              ).value,
+              this.storageService.setItemSync(input.id, {
+                ConfiguredName: configuredName,
+                CurrentVisibilityState: inputService.getCharacteristic(
+                  this.platform.Characteristic.CurrentVisibilityState,
+                ).value,
+              });
             });
-
-            callback(null);
-          });
 
           // Update input visibility cache
           inputService
             .getCharacteristic(this.platform.Characteristic.TargetVisibilityState)
-            .on('set', (targetVisibilityState, callback) => {
+            .onSet((targetVisibilityState: CharacteristicValue) => {
               const currentVisbility = inputService.getCharacteristic(
                 this.platform.Characteristic.CurrentVisibilityState,
               ).value;
 
               if (targetVisibilityState === currentVisbility) {
-                callback(null);
                 return;
               }
 
@@ -323,13 +208,11 @@ export class YamahaAVRAccessory {
                   inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value || input.text,
                 CurrentVisibilityState: targetVisibilityState,
               });
-
-              callback(null);
             });
 
           inputService
             .getCharacteristic(this.platform.Characteristic.Name)
-            .on('get', (callback) => callback(null, input.text));
+            .onGet((): CharacteristicValue => input.text);
 
           if (cachedService) {
             if (this.platform.Characteristic.CurrentVisibilityState.SHOWN !== cachedService.CurrentVisibilityState) {
@@ -417,12 +300,26 @@ export class YamahaAVRAccessory {
     }
   }
 
-  async updateAVRState() {
+  async getZoneStatus(): Promise<ZoneStatus | void> {
     try {
       const zoneStatusResponse = await fetch(`${this.baseApiUrl}/${this.zone}/getStatus`);
       const zoneStatus = (await zoneStatusResponse.json()) as ZoneStatus;
 
       if (zoneStatus.response_code !== 0) {
+        throw new Error();
+      }
+
+      return zoneStatus;
+    } catch {
+      this.platform.log.error('Failed to fetch zone status');
+    }
+  }
+
+  async updateAVRState() {
+    try {
+      const zoneStatus = await this.getZoneStatus();
+
+      if (!zoneStatus) {
         throw new Error('Failed to fetch zone power status');
       }
 
@@ -452,31 +349,23 @@ export class YamahaAVRAccessory {
     }
   }
 
-  async getPowerState(callback: CharacteristicGetCallback) {
-    try {
-      const zoneStatusResponse = await fetch(`${this.baseApiUrl}/${this.zone}/getStatus`);
-      const zoneStatus = (await zoneStatusResponse.json()) as ZoneStatus;
+  async getPowerState(): Promise<CharacteristicValue> {
+    const zoneStatus = await this.getZoneStatus();
 
-      if (zoneStatus.response_code !== 0) {
-        throw new Error('Failed to fetch zone power status');
-      }
-
-      callback(null, zoneStatus.power === 'on');
-    } catch (error) {
-      this.platform.log.error((error as Error).message);
-      callback(error as Error, false);
+    if (!zoneStatus) {
+      return false;
     }
+
+    return zoneStatus.power === 'on';
   }
 
-  async setPowerState(state: CharacteristicValue, callback: CharacteristicSetCallback) {
+  async setPowerState(state: CharacteristicValue) {
     try {
       let setPowerResponse: Response;
 
       if (state) {
-        this.platform.log.info('Power On');
         setPowerResponse = await fetch(`${this.baseApiUrl}/${this.zone}/setPower?power=on`);
       } else {
-        this.platform.log.info('Power Off');
         setPowerResponse = await fetch(`${this.baseApiUrl}/${this.zone}/setPower?power=standby`);
       }
 
@@ -485,15 +374,114 @@ export class YamahaAVRAccessory {
       if (responseJson.response_code !== 0) {
         throw new Error('Failed to set zone power');
       }
-
-      callback(null);
     } catch (error) {
       this.platform.log.error((error as Error).message);
-      callback(error as Error, false);
     }
   }
 
-  async setVolume(direction: CharacteristicValue, callback: CharacteristicSetCallback) {
+  async setRemoteKey(remoteKey: CharacteristicValue) {
+    try {
+      const sendRemoteCode = async (remoteKey: MainZoneRemoteCode) => {
+        const sendIrCodeResponse = await fetch(`${this.baseApiUrl}/system/sendIrCode?code=${remoteKey}`);
+        const responseJson = (await sendIrCodeResponse.json()) as BaseResponse;
+
+        if (responseJson.response_code !== 0) {
+          throw new Error('Failed to send ir code');
+        }
+      };
+
+      const controlCursor = async (cursor: Cursor) => {
+        const controlCursorResponse = await fetch(`${this.baseApiUrl}/${this.zone}/controlCursor?cursor=${cursor}`);
+        const responseJson = (await controlCursorResponse.json()) as BaseResponse;
+        if (responseJson.response_code !== 0) {
+          throw new Error('Failed to control cursor');
+        }
+      };
+
+      switch (remoteKey) {
+        case this.platform.Characteristic.RemoteKey.REWIND:
+          this.platform.log.info('set Remote Key Pressed: REWIND');
+          sendRemoteCode(MainZoneRemoteCode.SEARCH_BACK);
+          break;
+
+        case this.platform.Characteristic.RemoteKey.FAST_FORWARD:
+          this.platform.log.info('set Remote Key Pressed: FAST_FORWARD');
+          sendRemoteCode(MainZoneRemoteCode.SEARCH_FWD);
+          break;
+
+        case this.platform.Characteristic.RemoteKey.NEXT_TRACK:
+          this.platform.log.info('set Remote Key Pressed: NEXT_TRACK');
+          sendRemoteCode(MainZoneRemoteCode.SKIP_FWD);
+          break;
+
+        case this.platform.Characteristic.RemoteKey.PREVIOUS_TRACK:
+          this.platform.log.info('set Remote Key Pressed: PREVIOUS_TRACK');
+          sendRemoteCode(MainZoneRemoteCode.SKIP_BACK);
+          break;
+
+        case this.platform.Characteristic.RemoteKey.ARROW_UP:
+          this.platform.log.info('set Remote Key Pressed: ARROW_UP');
+          controlCursor('up');
+          break;
+
+        case this.platform.Characteristic.RemoteKey.ARROW_DOWN:
+          this.platform.log.info('set Remote Key Pressed: ARROW_DOWN');
+          controlCursor('down');
+          break;
+
+        case this.platform.Characteristic.RemoteKey.ARROW_LEFT:
+          this.platform.log.info('set Remote Key Pressed: ARROW_LEFT');
+          controlCursor('left');
+          break;
+
+        case this.platform.Characteristic.RemoteKey.ARROW_RIGHT:
+          this.platform.log.info('set Remote Key Pressed: ARROW_RIGHT');
+          controlCursor('right');
+          break;
+
+        case this.platform.Characteristic.RemoteKey.SELECT:
+          this.platform.log.info('set Remote Key Pressed: SELECT');
+          controlCursor('select');
+          break;
+
+        case this.platform.Characteristic.RemoteKey.BACK:
+          this.platform.log.info('set Remote Key Pressed: BACK');
+          controlCursor('return');
+          break;
+
+        case this.platform.Characteristic.RemoteKey.EXIT:
+          this.platform.log.info('set Remote Key Pressed: EXIT');
+          sendRemoteCode(MainZoneRemoteCode.TOP_MENU);
+          break;
+
+        case this.platform.Characteristic.RemoteKey.PLAY_PAUSE:
+          this.platform.log.info('set Remote Key Pressed: PLAY_PAUSE');
+          if (this.state.isPlaying) {
+            sendRemoteCode(MainZoneRemoteCode.PAUSE);
+          } else {
+            sendRemoteCode(MainZoneRemoteCode.PLAY);
+          }
+
+          this.state.isPlaying = !this.state.isPlaying;
+
+          break;
+
+        case this.platform.Characteristic.RemoteKey.INFORMATION:
+          this.platform.log.info('set Remote Key Pressed: INFORMATION');
+          // We'll use the info button to flick through inputs
+          sendRemoteCode(MainZoneRemoteCode.INPUT_FWD);
+          break;
+
+        default:
+          this.platform.log.info('unhandled Remote Key Pressed');
+          break;
+      }
+    } catch (error) {
+      this.platform.log.error((error as Error).message);
+    }
+  }
+
+  async setVolume(direction: CharacteristicValue) {
     try {
       const zoneStatusResponse = await fetch(`${this.baseApiUrl}/${this.zone}/getStatus`);
       const zoneStatus = (await zoneStatusResponse.json()) as ZoneStatus;
@@ -504,6 +492,7 @@ export class YamahaAVRAccessory {
 
       const currentVolume = zoneStatus.volume;
       const volumeStep = 5;
+
       let setVolumeResponse: Response;
 
       if (direction === 0) {
@@ -523,39 +512,26 @@ export class YamahaAVRAccessory {
       if (responseJson.response_code !== 0) {
         throw new Error('Failed to set zone volume');
       }
-
-      callback(null);
     } catch (error) {
       this.platform.log.error((error as Error).message);
-      callback(error as Error, false);
     }
   }
 
-  async getInputState(callback: CharacteristicGetCallback) {
-    try {
-      const zoneStatusResponse = await fetch(`${this.baseApiUrl}/${this.zone}/getStatus`);
-      const zoneStatus = (await zoneStatusResponse.json()) as ZoneStatus;
+  async getInputState(): Promise<CharacteristicValue> {
+    const zoneStatus = await this.getZoneStatus();
 
-      if (zoneStatus.response_code !== 0) {
-        throw new Error('Failed to fetch zone power status');
-      }
-
-      this.platform.log.info(`Current input: ${zoneStatus.input}`);
-
-      callback(
-        null,
-        this.state.inputs.findIndex((input) => input.id === zoneStatus.input),
-      );
-    } catch (error) {
-      this.platform.log.error((error as Error).message);
-      callback(error as Error, false);
+    if (!zoneStatus) {
+      return 0;
     }
+
+    this.platform.log.info(`Current ${this.zone} input: ${zoneStatus.input}`);
+
+    return this.state.inputs.findIndex((input) => input.id === zoneStatus.input);
   }
 
-  async setInputState(inputIndex: CharacteristicValue, callback: CharacteristicSetCallback) {
+  async setInputState(inputIndex: CharacteristicValue) {
     try {
       if (typeof inputIndex !== 'number') {
-        callback(null);
         return;
       }
 
@@ -569,11 +545,45 @@ export class YamahaAVRAccessory {
       }
 
       this.platform.log.info(`Set input: ${this.state.inputs[inputIndex].id}`);
-
-      callback(null);
     } catch (error) {
       this.platform.log.error((error as Error).message);
-      callback(error as Error, false);
+    }
+  }
+
+  // Brightness as Volume?
+  async getBrightness(): Promise<CharacteristicValue> {
+    const zoneStatus = await this.getZoneStatus();
+
+    if (!zoneStatus) {
+      return 100;
+    }
+
+    return (zoneStatus.volume / zoneStatus.max_volume) * 50;
+  }
+
+  async setBrightness(state: CharacteristicValue) {
+    try {
+      const zoneStatus = await this.getZoneStatus();
+
+      if (!zoneStatus) {
+        return 50;
+      }
+
+      const setVolumeResponse = await fetch(
+        `${this.baseApiUrl}/main/setVolume?volume=${((Number(state) * zoneStatus.max_volume) / 100).toFixed(0)}`,
+      );
+
+      const responseJson = (await setVolumeResponse.json()) as BaseResponse;
+
+      if (responseJson.response_code !== 0) {
+        throw new Error(
+          `Failed to set zone volume ${this.baseApiUrl}/main/setVolume?volume=${
+            (Number(state) * zoneStatus.max_volume) / 100
+          }`,
+        );
+      }
+    } catch (error) {
+      this.platform.log.error((error as Error).message);
     }
   }
 }
