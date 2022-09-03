@@ -25,7 +25,7 @@ export class YamahaVolumeAccessory {
         `${this.accessory.context.device.firmwareVersion}`,
       );
 
-    this.service = this.accessory.addService(this.platform.Service.Lightbulb);
+    this.service = this.accessory.addService(this.platform.Service.Fan);
 
     this.baseApiUrl = this.accessory.context.device.baseApiUrl;
     this.init();
@@ -36,13 +36,15 @@ export class YamahaVolumeAccessory {
 
   async init() {
     try {
-      await this.createSpeakerService();
+      await this.createService();
     } catch (err) {
       this.platform.log.error(err as string);
     }
   }
 
-  async createSpeakerService() {
+  async createService() {
+    this.service.setCharacteristic(this.platform.Characteristic.On, true);
+
     // Mute Get/Set
     this.service
       .getCharacteristic(this.platform.Characteristic.On)
@@ -51,11 +53,9 @@ export class YamahaVolumeAccessory {
 
     // Volume Get/Set
     this.service
-      .getCharacteristic(this.platform.Characteristic.Brightness)
+      .getCharacteristic(this.platform.Characteristic.RotationSpeed)
       .onSet(this.setVolume.bind(this))
       .onGet(this.getVolume.bind(this));
-
-    return;
   }
 
   async updateState() {
@@ -65,9 +65,9 @@ export class YamahaVolumeAccessory {
       return;
     }
 
-    this.service.updateCharacteristic(this.platform.Characteristic.On, zoneStatus.mute);
+    this.service.updateCharacteristic(this.platform.Characteristic.On, !zoneStatus.mute);
     this.service.updateCharacteristic(
-      this.platform.Characteristic.Brightness,
+      this.platform.Characteristic.RotationSpeed,
       (zoneStatus.volume / zoneStatus.max_volume) * 100,
     );
   }
@@ -79,12 +79,12 @@ export class YamahaVolumeAccessory {
       return false;
     }
 
-    return zoneStatus.mute;
+    return !zoneStatus.mute;
   }
 
   async setMute(state: CharacteristicValue) {
     try {
-      const setMuteResponse = await fetch(`${this.baseApiUrl}/main/setMute?enable=${state}`);
+      const setMuteResponse = await fetch(`${this.baseApiUrl}/${this.zone}/setMute?enable=${!state}`);
 
       const responseJson = (await setMuteResponse.json()) as BaseResponse;
 
@@ -115,17 +115,15 @@ export class YamahaVolumeAccessory {
       }
 
       const setVolumeResponse = await fetch(
-        `${this.baseApiUrl}/main/setVolume?volume=${((Number(state) * zoneStatus.max_volume) / 100).toFixed(0)}`,
+        `${this.baseApiUrl}/${this.zone}/setVolume?volume=${((Number(state) * zoneStatus.max_volume) / 100).toFixed(
+          0,
+        )}`,
       );
 
       const responseJson = (await setVolumeResponse.json()) as BaseResponse;
 
       if (responseJson.response_code !== 0) {
-        throw new Error(
-          `Failed to set zone volume ${this.baseApiUrl}/main/setVolume?volume=${
-            (Number(state) * zoneStatus.max_volume) / 100
-          }`,
-        );
+        throw new Error(`Failed to set zone volume`);
       }
     } catch (error) {
       this.platform.log.error((error as Error).message);

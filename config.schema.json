@@ -23,6 +23,18 @@
         "type": "string",
         "required": false
       },
+      "enablePureDirectSwitch": {
+        "title": "Enable Pure Direct Switch Device",
+        "type": "boolean",
+        "default": false,
+        "required": false
+      },
+      "volumeAccessoryEnabled": {
+        "title": "Enable Volume Devices",
+        "type": "boolean",
+        "default": false,
+        "required": false
+      },
       "zone2Enabled": {
         "title": "Enable Zone 2",
         "type": "boolean",
