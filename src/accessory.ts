@@ -7,10 +7,19 @@ import {
 } from 'homebridge';
 import fetch, { Response } from 'node-fetch';
 
-import { PLUGIN_NAME } from './settings.js';
 import { YamahaAVRPlatform } from './platform.js';
 import { StorageService } from './storageService.js';
-import { AccessoryContext, BaseResponse, Cursor, Input, MainZoneRemoteCode, NameText, ZoneStatus } from './types.js';
+import {
+  AccessoryContext,
+  BaseResponse,
+  Cursor,
+  Features,
+  Input,
+  MainZoneRemoteCode,
+  NameText,
+  Zone,
+  ZoneStatus,
+} from './types.js';
 
 interface CachedServiceData {
   Identifier: number;
@@ -38,8 +47,10 @@ export class YamahaAVRAccessory {
   constructor(
     private readonly platform: YamahaAVRPlatform,
     private readonly accessory: PlatformAccessory<AccessoryContext>,
+    private readonly zone: Zone['id'],
   ) {
-    this.cacheDirectory = this.platform.config.cacheDirectory || this.platform.api.user.storagePath() + '/.yamahaAVR/';
+    this.cacheDirectory =
+      this.platform.config.cacheDirectory || this.platform.api.user.storagePath() + '/.yamahaAVR/' + this.zone;
     this.storageService = new StorageService(this.cacheDirectory);
     this.storageService.initSync();
 
@@ -68,9 +79,6 @@ export class YamahaAVRAccessory {
       await this.createTVService();
       await this.createTVSpeakerService();
       await this.createInputSourceServices();
-
-      // Wait for all services to be created before publishing
-      this.platform.api.publishExternalAccessories(PLUGIN_NAME, [this.accessory]);
     } catch (err) {
       this.platform.log.error(err as string);
     }
@@ -110,7 +118,7 @@ export class YamahaAVRAccessory {
       };
 
       const controlCursor = async (cursor: Cursor, callback?: CharacteristicSetCallback) => {
-        await fetch(`${this.baseApiUrl}/main/controlCursor?cursor=${cursor}`);
+        await fetch(`${this.baseApiUrl}/${this.zone}/controlCursor?cursor=${cursor}`);
 
         if (!callback) {
           return;
@@ -389,10 +397,18 @@ export class YamahaAVRAccessory {
 
   async updateInputSources() {
     try {
+      const featuresResponse = await fetch(`${this.baseApiUrl}/system/getFeatures`);
+      const features = (await featuresResponse.json()) as Features;
+      const zoneInputs = features.zone.find((zone) => zone.id === this.zone)?.input_list;
+
+      if (!zoneInputs) {
+        throw new Error();
+      }
+
       const getNameTextResponse = await fetch(`${this.baseApiUrl}/system/getNameText`);
       const nameText = (await getNameTextResponse.json()) as NameText;
-      const inputList = nameText.input_list;
-      this.state.inputs = inputList.filter((input) => input.id !== 'main_sync' && input.id !== 'none');
+
+      this.state.inputs = nameText.input_list.filter((input) => zoneInputs.includes(input.id));
     } catch {
       this.platform.log.error(`
       Failed to get available inputs from ${this.platform.config.name}.
@@ -403,7 +419,7 @@ export class YamahaAVRAccessory {
 
   async updateAVRState() {
     try {
-      const zoneStatusResponse = await fetch(`${this.baseApiUrl}/main/getStatus`);
+      const zoneStatusResponse = await fetch(`${this.baseApiUrl}/${this.zone}/getStatus`);
       const zoneStatus = (await zoneStatusResponse.json()) as ZoneStatus;
 
       if (zoneStatus.response_code !== 0) {
@@ -438,7 +454,7 @@ export class YamahaAVRAccessory {
 
   async getPowerState(callback: CharacteristicGetCallback) {
     try {
-      const zoneStatusResponse = await fetch(`${this.baseApiUrl}/main/getStatus`);
+      const zoneStatusResponse = await fetch(`${this.baseApiUrl}/${this.zone}/getStatus`);
       const zoneStatus = (await zoneStatusResponse.json()) as ZoneStatus;
 
       if (zoneStatus.response_code !== 0) {
@@ -458,10 +474,10 @@ export class YamahaAVRAccessory {
 
       if (state) {
         this.platform.log.info('Power On');
-        setPowerResponse = await fetch(`${this.baseApiUrl}/main/setPower?power=on`);
+        setPowerResponse = await fetch(`${this.baseApiUrl}/${this.zone}/setPower?power=on`);
       } else {
         this.platform.log.info('Power Off');
-        setPowerResponse = await fetch(`${this.baseApiUrl}/main/setPower?power=standby`);
+        setPowerResponse = await fetch(`${this.baseApiUrl}/${this.zone}/setPower?power=standby`);
       }
 
       const responseJson = (await setPowerResponse.json()) as BaseResponse;
@@ -479,7 +495,7 @@ export class YamahaAVRAccessory {
 
   async setVolume(direction: CharacteristicValue, callback: CharacteristicSetCallback) {
     try {
-      const zoneStatusResponse = await fetch(`${this.baseApiUrl}/main/getStatus`);
+      const zoneStatusResponse = await fetch(`${this.baseApiUrl}/${this.zone}/getStatus`);
       const zoneStatus = (await zoneStatusResponse.json()) as ZoneStatus;
 
       if (zoneStatus.response_code !== 0) {
@@ -492,10 +508,14 @@ export class YamahaAVRAccessory {
 
       if (direction === 0) {
         this.platform.log.info('Volume Up', currentVolume + volumeStep);
-        setVolumeResponse = await fetch(`${this.baseApiUrl}/main/setVolume?power=${currentVolume + volumeStep}`);
+        setVolumeResponse = await fetch(
+          `${this.baseApiUrl}/${this.zone}/setVolume?power=${currentVolume + volumeStep}`,
+        );
       } else {
         this.platform.log.info('Volume Down', currentVolume - volumeStep);
-        setVolumeResponse = await fetch(`${this.baseApiUrl}/main/setVolume?power=${currentVolume - volumeStep}`);
+        setVolumeResponse = await fetch(
+          `${this.baseApiUrl}/${this.zone}/setVolume?power=${currentVolume - volumeStep}`,
+        );
       }
 
       const responseJson = (await setVolumeResponse.json()) as BaseResponse;
@@ -513,7 +533,7 @@ export class YamahaAVRAccessory {
 
   async getInputState(callback: CharacteristicGetCallback) {
     try {
-      const zoneStatusResponse = await fetch(`${this.baseApiUrl}/main/getStatus`);
+      const zoneStatusResponse = await fetch(`${this.baseApiUrl}/${this.zone}/getStatus`);
       const zoneStatus = (await zoneStatusResponse.json()) as ZoneStatus;
 
       if (zoneStatus.response_code !== 0) {
@@ -540,7 +560,7 @@ export class YamahaAVRAccessory {
       }
 
       const setInputResponse = await fetch(
-        `${this.baseApiUrl}/main/setInput?input=${this.state.inputs[inputIndex].id}`,
+        `${this.baseApiUrl}/${this.zone}/setInput?input=${this.state.inputs[inputIndex].id}`,
       );
       const responseJson = (await setInputResponse.json()) as BaseResponse;
 

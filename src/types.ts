@@ -21,6 +21,17 @@ export interface DeviceInfo {
   update_data_type: number;
 }
 
+export interface Features {
+  response_code: number;
+  system: {
+    zone_num: number;
+  };
+  zone: {
+    id: Zone['id'];
+    input_list: Input['id'][];
+  }[];
+}
+
 export interface ZoneStatus {
   response_code: number;
   power: 'on' | 'standby';
@@ -192,7 +203,6 @@ export interface NameText {
 
 export interface AccessoryContext {
   device: {
-    uuid: string;
     displayName: string;
     modelName: DeviceInfo['model_name'];
     systemId: DeviceInfo['system_id'];
