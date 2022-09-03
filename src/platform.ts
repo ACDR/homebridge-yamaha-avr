@@ -87,7 +87,11 @@ export class YamahaAVRPlatform implements IndependentPlatformPlugin {
   }
 
   async createAVRAccessory(device: AccessoryContext['device'], zone: Zone['id']): Promise<PlatformAccessory> {
-    const uuid = this.api.hap.uuid.generate(`${device.systemId}_${this.config.ip}_${zone}`);
+    let uuid = this.api.hap.uuid.generate(`${device.systemId}_${this.config.ip}`);
+
+    if (zone !== 'main') {
+      uuid = `${uuid}_${zone}`;
+    }
 
     const accessory = new this.api.platformAccessory<AccessoryContext>(
       `${device.displayName} ${zone}`,
