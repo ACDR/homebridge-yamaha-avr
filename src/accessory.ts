@@ -14,6 +14,7 @@ import {
   Zone,
   ZoneStatus,
 } from './types.js';
+import { getZoneStatus } from './utils/getZoneStatus.js';
 
 interface CachedServiceData {
   Identifier: number;
@@ -302,27 +303,12 @@ export class YamahaAVRAccessory {
     }
   }
 
-  async getZoneStatus(): Promise<ZoneStatus | void> {
-    try {
-      const zoneStatusResponse = await fetch(`${this.baseApiUrl}/${this.zone}/getStatus`);
-      const zoneStatus = (await zoneStatusResponse.json()) as ZoneStatus;
-
-      if (zoneStatus.response_code !== 0) {
-        throw new Error();
-      }
-
-      return zoneStatus;
-    } catch {
-      this.platform.log.error('Failed to fetch zone status');
-    }
-  }
-
   async updateAVRState() {
     try {
-      const zoneStatus = await this.getZoneStatus();
+      const zoneStatus = await getZoneStatus(this.platform, this.accessory, this.zone);
 
       if (!zoneStatus) {
-        throw new Error('Failed to fetch zone power status');
+        throw new Error();
       }
 
       this.platform.log.debug(`AVR PING`, { power: zoneStatus.power, input: zoneStatus.input });
@@ -352,7 +338,7 @@ export class YamahaAVRAccessory {
   }
 
   async getPowerState(): Promise<CharacteristicValue> {
-    const zoneStatus = await this.getZoneStatus();
+    const zoneStatus = await getZoneStatus(this.platform, this.accessory, this.zone);
 
     if (!zoneStatus) {
       return false;
@@ -520,7 +506,7 @@ export class YamahaAVRAccessory {
   }
 
   async getInputState(): Promise<CharacteristicValue> {
-    const zoneStatus = await this.getZoneStatus();
+    const zoneStatus = await getZoneStatus(this.platform, this.accessory, this.zone);
 
     if (!zoneStatus) {
       return 0;
@@ -547,43 +533,6 @@ export class YamahaAVRAccessory {
       }
 
       this.platform.log.info(`Set input: ${this.state.inputs[inputIndex].id}`);
-    } catch (error) {
-      this.platform.log.error((error as Error).message);
-    }
-  }
-
-  // Brightness as Volume?
-  async getBrightness(): Promise<CharacteristicValue> {
-    const zoneStatus = await this.getZoneStatus();
-
-    if (!zoneStatus) {
-      return 100;
-    }
-
-    return (zoneStatus.volume / zoneStatus.max_volume) * 50;
-  }
-
-  async setBrightness(state: CharacteristicValue) {
-    try {
-      const zoneStatus = await this.getZoneStatus();
-
-      if (!zoneStatus) {
-        return 50;
-      }
-
-      const setVolumeResponse = await fetch(
-        `${this.baseApiUrl}/main/setVolume?volume=${((Number(state) * zoneStatus.max_volume) / 100).toFixed(0)}`,
-      );
-
-      const responseJson = (await setVolumeResponse.json()) as BaseResponse;
-
-      if (responseJson.response_code !== 0) {
-        throw new Error(
-          `Failed to set zone volume ${this.baseApiUrl}/main/setVolume?volume=${
-            (Number(state) * zoneStatus.max_volume) / 100
-          }`,
-        );
-      }
     } catch (error) {
       this.platform.log.error((error as Error).message);
     }

@@ -26,10 +26,12 @@ export interface Features {
   system: {
     zone_num: number;
   };
-  zone: {
-    id: Zone['id'];
-    input_list: Input['id'][];
-  }[];
+  zone: FeatureZone[];
+}
+
+export interface FeatureZone {
+  id: Zone['id'];
+  input_list: Input['id'][];
 }
 
 export interface ZoneStatus {

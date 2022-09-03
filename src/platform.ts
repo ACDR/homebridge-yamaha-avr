@@ -10,27 +10,23 @@ import {
 import fetch from 'node-fetch';
 
 import { YamahaAVRAccessory } from './accessory.js';
+import { YamahaVolumeAccessory } from './volumeAccessory.js';
 import { PLUGIN_NAME } from './settings.js';
 import { AccessoryContext, DeviceInfo, Features, Zone } from './types.js';
 
 export class YamahaAVRPlatform implements IndependentPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
   public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
-  public readonly accessories: PlatformAccessory[] = [];
+  public readonly platformAccessories: PlatformAccessory[] = [];
 
   constructor(public readonly log: Logger, public readonly config: PlatformConfig, public readonly api: API) {
     this.log.debug('Finished initializing platform:', this.config.name);
     // store restored cached accessories here
-    this.accessories = [];
+    this.platformAccessories = [];
 
     this.api.on('didFinishLaunching', () => {
       this.discoverAVR();
     });
-  }
-
-  configureAccessory(accessory) {
-    this.log.info('Loading accessory from cache:', accessory.displayName);
-    this.accessories.push(accessory);
   }
 
   async discoverAVR() {
@@ -54,36 +50,30 @@ export class YamahaAVRPlatform implements IndependentPlatformPlugin {
         baseApiUrl,
       };
 
-      const platformAccessories: PlatformAccessory[] = [];
+      await this.createZoneAccessories(device, 'main');
 
-      const mainAccessory = await this.createAVRAccessory(device, 'main');
-      platformAccessories.push(mainAccessory);
+      this.config.zone2Enabled && features.zone.length > 1 && (await this.createZoneAccessories(device, 'zone2'));
+      this.config.zone3Enabled && features.zone.length > 2 && (await this.createZoneAccessories(device, 'zone3'));
+      this.config.zone4Enabled && features.zone.length > 3 && (await this.createZoneAccessories(device, 'zone4'));
 
-      if (features.system.zone_num > 1) {
-        const zone2Accessory = await this.createAVRAccessory(device, 'zone2');
-        platformAccessories.push(zone2Accessory);
-      }
-
-      if (features.system.zone_num > 2) {
-        const zone3Accessory = await this.createAVRAccessory(device, 'zone3');
-        platformAccessories.push(zone3Accessory);
-      }
-
-      if (features.system.zone_num > 3) {
-        const zone4Accessory = await this.createAVRAccessory(device, 'zone4');
-        platformAccessories.push(zone4Accessory);
-      }
-
-      if (platformAccessories.length === 0) {
+      if (this.platformAccessories.length === 0) {
         return;
       }
 
-      this.api.publishExternalAccessories(PLUGIN_NAME, platformAccessories);
+      this.api.publishExternalAccessories(PLUGIN_NAME, this.platformAccessories);
     } catch {
       this.log.error(`
         Failed to get system config from ${this.config.name}. Please verify the AVR is connected and accessible at ${this.config.ip}
       `);
     }
+  }
+
+  async createZoneAccessories(device, zone) {
+    const avrAccessory = await this.createAVRAccessory(device, zone);
+    this.platformAccessories.push(avrAccessory);
+
+    // const volumeAccessory = await this.createVolumeAccessory(device, zone);
+    // this.platformAccessories.push(volumeAccessory);
   }
 
   async createAVRAccessory(device: AccessoryContext['device'], zone: Zone['id']): Promise<PlatformAccessory> {
@@ -104,6 +94,28 @@ export class YamahaAVRPlatform implements IndependentPlatformPlugin {
     accessory.context = { device };
 
     new YamahaAVRAccessory(this, accessory, zone);
+
+    return accessory;
+  }
+
+  async createVolumeAccessory(device: AccessoryContext['device'], zone: Zone['id']): Promise<PlatformAccessory> {
+    let uuid = `${device.systemId}_${this.config.ip}_volume`;
+
+    if (zone !== 'main') {
+      uuid = `${uuid}_${zone}`;
+    }
+
+    uuid = this.api.hap.uuid.generate(uuid);
+
+    const accessory = new this.api.platformAccessory<AccessoryContext>(
+      `${device.displayName} ${zone}`,
+      uuid,
+      this.api.hap.Categories.AUDIO_RECEIVER,
+    );
+
+    accessory.context = { device };
+
+    new YamahaVolumeAccessory(this, accessory, zone);
 
     return accessory;
   }

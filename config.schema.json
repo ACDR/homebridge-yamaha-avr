@@ -22,6 +22,24 @@
         "description": "Default: ~/.homebridge/.yamahaAVR",
         "type": "string",
         "required": false
+      },
+      "zone2Enabled": {
+        "title": "Enable Zone 2",
+        "type": "boolean",
+        "default": false,
+        "required": false
+      },
+      "zone3Enabled": {
+        "title": "Enable Zone 3",
+        "type": "boolean",
+        "default": false,
+        "required": false
+      },
+      "zone4Enabled": {
+        "title": "Enable Zone 4",
+        "type": "boolean",
+        "default": false,
+        "required": false
       }
     }
   }
