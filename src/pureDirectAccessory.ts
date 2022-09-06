@@ -55,14 +55,7 @@ export class YamahaPureDirectAccessory {
       return;
     }
 
-    this.service.updateCharacteristic(
-      this.platform.Characteristic.ProgrammableSwitchOutputState,
-      zoneStatus.pure_direct,
-    );
-  }
-
-  async getSwitchEvent(): Promise<CharacteristicValue> {
-    return this.platform.Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS;
+    this.service.updateCharacteristic(this.platform.Characteristic.On, zoneStatus.pure_direct);
   }
 
   async getState(): Promise<CharacteristicValue> {

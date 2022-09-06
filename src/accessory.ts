@@ -44,10 +44,13 @@ export class YamahaAVRAccessory {
     private readonly accessory: PlatformAccessory<AccessoryContext>,
     private readonly zone: Zone['id'],
   ) {
-    this.cacheDirectory =
-      this.platform.config.cacheDirectory || this.platform.api.user.storagePath() + '/.yamahaAVR/' + this.zone;
+    this.cacheDirectory = this.platform.config.cacheDirectory
+      ? `${this.platform.config.cacheDirectory}/${this.zone}`.replace('//', '/')
+      : this.platform.api.user.storagePath() + '/.yamahaAVR/' + this.zone;
     this.storageService = new StorageService(this.cacheDirectory);
     this.storageService.initSync();
+
+    this.platform.log.debug('cache directory', this.cacheDirectory);
 
     // set the AVR accessory information
     this.accessory
@@ -160,7 +163,10 @@ export class YamahaAVRAccessory {
           // Update input name cache
           inputService
             .getCharacteristic(this.platform.Characteristic.ConfiguredName)
-            .onGet((): CharacteristicValue => cachedService?.ConfiguredName || input.text)
+            .onGet(async (): Promise<CharacteristicValue> => {
+              const cachedServiceGet = await this.storageService.getItem<CachedServiceData>(input.id);
+              return cachedServiceGet?.ConfiguredName || input.text;
+            })
             .onSet((name: CharacteristicValue) => {
               const currentConfiguredName = inputService.getCharacteristic(
                 this.platform.Characteristic.ConfiguredName,
@@ -187,7 +193,10 @@ export class YamahaAVRAccessory {
           // Update input visibility cache
           inputService
             .getCharacteristic(this.platform.Characteristic.TargetVisibilityState)
-            .onGet((): CharacteristicValue => cachedService?.CurrentVisibilityState || 0)
+            .onGet(async (): Promise<CharacteristicValue> => {
+              const cachedServiceGet = await this.storageService.getItem<CachedServiceData>(input.id);
+              return cachedServiceGet?.CurrentVisibilityState || 0;
+            })
             .onSet((targetVisibilityState: CharacteristicValue) => {
               const currentVisbility = inputService.getCharacteristic(
                 this.platform.Characteristic.CurrentVisibilityState,
