@@ -3,6 +3,12 @@
 <img src="https://github.com/homebridge/branding/raw/master/logos/homebridge-wordmark-logo-vertical.png" width="150">
 
 </p>
+<p align="center">
+<a href="https://www.npmjs.com/package/homebridge-yamaha-avr"><img title="npm version" src="https://badgen.net/npm/v/homebridge-yamaha-avr?label=latest"></a>
+<img title="npm version" src="https://badgen.net/npm/v/homebridge-yamaha-avr/beta?label=beta&v=0">
+<a href="https://www.npmjs.com/package/homebridge-yamaha-avr"><img title="npm downloads" src="https://badgen.net/npm/dt/homebridge-yamaha-avr"></a>
+
+</p>
 
 # homebridge-yamaha-avr
 
