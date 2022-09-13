@@ -74,6 +74,7 @@ export class YamahaAVRAccessory {
 
   async init() {
     try {
+      await this.updateInputSources();
       await this.createTVService();
       await this.createTVSpeakerService();
       await this.createInputSourceServices();
@@ -126,167 +127,153 @@ export class YamahaAVRAccessory {
   }
 
   async createInputSourceServices() {
-    await this.updateInputSources();
+    this.state.inputs.forEach(async (input, i) => {
+      const cachedService = await this.storageService.getItem<CachedServiceData>(input.id);
 
-    return new Promise<void>((resolve, reject) => {
-      this.state.inputs.forEach(async (input, i) => {
-        const cachedService = await this.storageService.getItem<CachedServiceData>(input.id);
+      try {
+        const inputService = this.accessory.addService(this.platform.Service.InputSource, input.text, input.id);
 
-        try {
-          const inputService = this.accessory.addService(
-            this.platform.Service.InputSource,
-            this.platform.api.hap.uuid.generate(input.id),
-            input.text,
+        inputService
+          .setCharacteristic(this.platform.Characteristic.Identifier, i)
+          .setCharacteristic(this.platform.Characteristic.Name, input.text)
+          .setCharacteristic(this.platform.Characteristic.ConfiguredName, cachedService?.ConfiguredName || input.text)
+          .setCharacteristic(
+            this.platform.Characteristic.IsConfigured,
+            this.platform.Characteristic.IsConfigured.CONFIGURED,
+          )
+          .setCharacteristic(
+            this.platform.Characteristic.CurrentVisibilityState,
+            this.platform.Characteristic.CurrentVisibilityState.SHOWN,
+          )
+          .setCharacteristic(
+            this.platform.Characteristic.InputSourceType,
+            this.platform.Characteristic.InputSourceType.APPLICATION,
+          )
+          .setCharacteristic(
+            this.platform.Characteristic.InputDeviceType,
+            this.platform.Characteristic.InputDeviceType.TV,
           );
 
-          inputService
-            .setCharacteristic(this.platform.Characteristic.Identifier, i)
-            .setCharacteristic(this.platform.Characteristic.Name, input.text)
-            .setCharacteristic(this.platform.Characteristic.ConfiguredName, cachedService?.ConfiguredName || input.text)
-            .setCharacteristic(
-              this.platform.Characteristic.IsConfigured,
-              this.platform.Characteristic.IsConfigured.CONFIGURED,
-            )
-            .setCharacteristic(
-              this.platform.Characteristic.CurrentVisibilityState,
-              this.platform.Characteristic.CurrentVisibilityState.SHOWN,
-            )
-            .setCharacteristic(
-              this.platform.Characteristic.InputSourceType,
-              this.platform.Characteristic.InputSourceType.APPLICATION,
-            )
-            .setCharacteristic(
-              this.platform.Characteristic.InputDeviceType,
-              this.platform.Characteristic.InputDeviceType.TV,
-            );
-
-          // Update input name cache
-          inputService
-            .getCharacteristic(this.platform.Characteristic.ConfiguredName)
-            .onGet(async (): Promise<CharacteristicValue> => {
-              const cachedServiceGet = await this.storageService.getItem<CachedServiceData>(input.id);
-              return cachedServiceGet?.ConfiguredName || input.text;
-            })
-            .onSet((name: CharacteristicValue) => {
-              const currentConfiguredName = inputService.getCharacteristic(
-                this.platform.Characteristic.ConfiguredName,
-              ).value;
-
-              if (name === currentConfiguredName) {
-                return;
-              }
-
-              this.platform.log.debug(`Set input (${input.id}) name to ${name} `);
-
-              const configuredName = name || input.text;
-
-              inputService.updateCharacteristic(this.platform.Characteristic.ConfiguredName, configuredName);
-
-              this.storageService.setItemSync(input.id, {
-                ConfiguredName: configuredName,
-                CurrentVisibilityState: inputService.getCharacteristic(
-                  this.platform.Characteristic.CurrentVisibilityState,
-                ).value,
-              });
-            });
-
-          // Update input visibility cache
-          inputService
-            .getCharacteristic(this.platform.Characteristic.TargetVisibilityState)
-            .onGet(async (): Promise<CharacteristicValue> => {
-              const cachedServiceGet = await this.storageService.getItem<CachedServiceData>(input.id);
-              return cachedServiceGet?.CurrentVisibilityState || 0;
-            })
-            .onSet((targetVisibilityState: CharacteristicValue) => {
-              const currentVisbility = inputService.getCharacteristic(
-                this.platform.Characteristic.CurrentVisibilityState,
-              ).value;
-
-              if (targetVisibilityState === currentVisbility) {
-                return;
-              }
-
-              const isHidden = targetVisibilityState === this.platform.Characteristic.TargetVisibilityState.HIDDEN;
-
-              this.platform.log.debug(`Set input (${input.id}) visibility state to ${isHidden ? 'HIDDEN' : 'SHOWN'} `);
-
-              inputService.updateCharacteristic(
-                this.platform.Characteristic.CurrentVisibilityState,
-                targetVisibilityState,
-              );
-
-              this.storageService.setItemSync(input.id, {
-                ConfiguredName:
-                  inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value || input.text,
-                CurrentVisibilityState: targetVisibilityState,
-              });
-            });
-
-          inputService
-            .getCharacteristic(this.platform.Characteristic.Name)
-            .onGet((): CharacteristicValue => input.text);
-
-          if (cachedService) {
-            if (this.platform.Characteristic.CurrentVisibilityState.SHOWN !== cachedService.CurrentVisibilityState) {
-              this.platform.log.debug(`Restoring input ${input.id} visibility state from cache`);
-
-              inputService.setCharacteristic(
-                this.platform.Characteristic.CurrentVisibilityState,
-                cachedService.CurrentVisibilityState,
-              );
-            }
-
-            if (input.text !== cachedService.ConfiguredName && cachedService.ConfiguredName !== '') {
-              this.platform.log.debug(`Restoring input ${input.id} configured name from cache`);
-              inputService.setCharacteristic(this.platform.Characteristic.ConfiguredName, cachedService.ConfiguredName);
-            }
-          }
-
-          this.service.addLinkedService(inputService);
-          this.inputServices.push(inputService);
-
-          try {
-            // Cache Data
-            const name =
-              inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value || input.text;
-            const visibility = inputService.getCharacteristic(
-              this.platform.Characteristic.CurrentVisibilityState,
+        // Update input name cache
+        inputService
+          .getCharacteristic(this.platform.Characteristic.ConfiguredName)
+          .onGet(async (): Promise<CharacteristicValue> => {
+            const cachedServiceGet = await this.storageService.getItem<CachedServiceData>(input.id);
+            return cachedServiceGet?.ConfiguredName || input.text;
+          })
+          .onSet((name: CharacteristicValue) => {
+            const currentConfiguredName = inputService.getCharacteristic(
+              this.platform.Characteristic.ConfiguredName,
             ).value;
 
-            if (cachedService?.ConfiguredName === name && cachedService.CurrentVisibilityState === visibility) {
-              resolve();
+            if (name === currentConfiguredName) {
               return;
             }
 
-            this.platform.log.debug(
-              `Cache input (${input.id}). Name: "${name}", Visibility: "${visibility ? 'HIDDEN' : 'SHOWN'}" `,
+            this.platform.log.debug(`Set input (${input.id}) name to ${name} `);
+
+            const configuredName = name || input.text;
+
+            inputService.updateCharacteristic(this.platform.Characteristic.ConfiguredName, configuredName);
+
+            this.storageService.setItemSync(input.id, {
+              ConfiguredName: configuredName,
+              CurrentVisibilityState: inputService.getCharacteristic(
+                this.platform.Characteristic.CurrentVisibilityState,
+              ).value,
+            });
+          });
+
+        // Update input visibility cache
+        inputService
+          .getCharacteristic(this.platform.Characteristic.TargetVisibilityState)
+          .onGet(async (): Promise<CharacteristicValue> => {
+            const cachedServiceGet = await this.storageService.getItem<CachedServiceData>(input.id);
+            return cachedServiceGet?.CurrentVisibilityState || 0;
+          })
+          .onSet((targetVisibilityState: CharacteristicValue) => {
+            const currentVisbility = inputService.getCharacteristic(
+              this.platform.Characteristic.CurrentVisibilityState,
+            ).value;
+
+            if (targetVisibilityState === currentVisbility) {
+              return;
+            }
+
+            const isHidden = targetVisibilityState === this.platform.Characteristic.TargetVisibilityState.HIDDEN;
+
+            this.platform.log.debug(`Set input (${input.id}) visibility state to ${isHidden ? 'HIDDEN' : 'SHOWN'} `);
+
+            inputService.updateCharacteristic(
+              this.platform.Characteristic.CurrentVisibilityState,
+              targetVisibilityState,
             );
 
             this.storageService.setItemSync(input.id, {
-              ConfiguredName: name,
-              CurrentVisibilityState: visibility,
+              ConfiguredName:
+                inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value || input.text,
+              CurrentVisibilityState: targetVisibilityState,
             });
+          });
 
-            if (this.inputServices.length === this.state.inputs.length) {
-              resolve();
-            }
-          } catch (err) {
-            reject(
-              `
-              Could not write to cache.
-              Please check your Homebridge instance has permission to write to
-              "${this.cacheDirectory}"
-              or set a different cache directory using the "cacheDirectory" config property.
-            `,
+        inputService.getCharacteristic(this.platform.Characteristic.Name).onGet((): CharacteristicValue => input.text);
+
+        if (cachedService) {
+          if (this.platform.Characteristic.CurrentVisibilityState.SHOWN !== cachedService.CurrentVisibilityState) {
+            this.platform.log.debug(`Restoring input ${input.id} visibility state from cache`);
+
+            inputService.setCharacteristic(
+              this.platform.Characteristic.CurrentVisibilityState,
+              cachedService.CurrentVisibilityState,
             );
           }
-        } catch (err) {
-          this.platform.log.error(`
-            Failed to add input service ${input.id}:
-            ${err}
-          `);
+
+          if (input.text !== cachedService.ConfiguredName && cachedService.ConfiguredName !== '') {
+            this.platform.log.debug(`Restoring input ${input.id} configured name from cache`);
+            inputService.setCharacteristic(this.platform.Characteristic.ConfiguredName, cachedService.ConfiguredName);
+          }
         }
-      });
+
+        this.service.addLinkedService(inputService);
+        this.inputServices.push(inputService);
+
+        try {
+          // Cache Data
+          const name = inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value || input.text;
+          const visibility = inputService.getCharacteristic(this.platform.Characteristic.CurrentVisibilityState).value;
+
+          if (cachedService?.ConfiguredName === name && cachedService.CurrentVisibilityState === visibility) {
+            return;
+          }
+
+          this.platform.log.debug(
+            `Cache input (${input.id}). Name: "${name}", Visibility: "${visibility ? 'HIDDEN' : 'SHOWN'}" `,
+          );
+
+          this.storageService.setItemSync(input.id, {
+            ConfiguredName: name,
+            CurrentVisibilityState: visibility,
+          });
+
+          if (this.inputServices.length === this.state.inputs.length) {
+            return;
+          }
+        } catch (err) {
+          this.platform.log.error(
+            `
+            Could not write to cache.
+            Please check your Homebridge instance has permission to write to
+            "${this.cacheDirectory}"
+            or set a different cache directory using the "cacheDirectory" config property.
+          `,
+          );
+        }
+      } catch (err) {
+        this.platform.log.error(`
+          Failed to add input service ${input.id}:
+          ${err}
+        `);
+      }
     });
   }
 
