@@ -42,7 +42,7 @@ export interface ZoneStatus {
   mute: boolean;
   max_volume: number;
   input: Input['id'];
-  input_text: Input['text'];
+  input_text: Input['name'];
   distribution_enable: boolean;
   sound_program: SoundProgram['id'];
   surr_decoder_type: string;
@@ -78,71 +78,9 @@ export interface Zone {
 }
 
 export interface Input {
-  id:
-    | 'cd'
-    | 'tuner'
-    | 'multi_ch'
-    | 'phono'
-    | 'hdmi1'
-    | 'hdmi2'
-    | 'hdmi3'
-    | 'hdmi4'
-    | 'hdmi5'
-    | 'hdmi6'
-    | 'hdmi7'
-    | 'hdmi8'
-    | 'hdmi'
-    | 'av1'
-    | 'av2'
-    | 'av3'
-    | 'av4'
-    | 'av5'
-    | 'av6'
-    | 'av7'
-    | 'v_aux'
-    | 'aux1'
-    | 'aux2'
-    | 'aux'
-    | 'audio1'
-    | 'audio2'
-    | 'audio3'
-    | 'audio4'
-    | 'audio_cd'
-    | 'audio'
-    | 'optical1'
-    | 'optical2'
-    | 'optical'
-    | 'coaxial1'
-    | 'coaxial2'
-    | 'coaxial'
-    | 'digital1'
-    | 'digital2'
-    | 'digital'
-    | 'line1'
-    | 'line2'
-    | 'line3'
-    | 'line_cd'
-    | 'analog'
-    | 'tv'
-    | 'bd_dvd'
-    | 'usb_dac'
-    | 'usb'
-    | 'bluetooth'
-    | 'server'
-    | 'net_radio'
-    | 'rhapsody'
-    | 'napster'
-    | 'pandora'
-    | 'siriusxm'
-    | 'spotify'
-    | 'juke'
-    | 'airplay'
-    | 'radiko'
-    | 'qobuz'
-    | 'mc_link'
-    | 'main_sync'
-    | 'none';
-  text: string;
+  avrId: string;
+  id: string;
+  name: string;
 }
 
 export interface SoundProgram {
@@ -213,7 +151,7 @@ export interface AccessoryContext {
   };
 }
 
-export type Cursor = 'up' | 'down' | 'left' | 'right' | 'select' | 'return';
+export type Cursor = 'Up' | 'Down' | 'Left' | 'Right' | 'Sel' | 'Return';
 
 export enum MainZoneRemoteCode {
   // numeric codes
@@ -293,4 +231,47 @@ export enum Zone2RemoteCode {
   OPTION = '7A856C12',
   TOP_MENU = '7A85A1DF',
   POP_UP_MENU = '7A85A5DB',
+}
+export interface YamahaAPI {
+  getBasicInfo: () => Promise<{
+    isOn: () => boolean;
+    getVolume: () => number;
+    getCurrentInput: () => string;
+  }>;
+  getSystemConfig: () => Promise<{
+    YAMAHA_AV: {
+      System: {
+        Config: {
+          Model_Name: string[];
+          System_ID: string[];
+          Version: string[];
+          Feature_Existence: {
+            [key: string]: string[];
+          }[];
+          Name: {
+            Input: string[];
+          };
+        }[];
+      }[];
+    };
+  }>;
+  getAvailableFeatures: () => Promise<string[]>;
+  getAvailableInputsWithNames: () => Promise<
+    {
+      id: string;
+      name: string;
+    }[][]
+  >;
+  isOn: () => Promise<boolean>;
+  powerOn: () => Promise<string>;
+  powerOff: () => Promise<string>;
+  volumeUp: (number) => Promise<string>;
+  volumeDown: (number) => Promise<string>;
+  setInputTo: (string) => Promise<string>;
+  rewind: () => Promise<string>;
+  skip: () => Promise<string>;
+  pause: () => Promise<string>;
+  play: () => Promise<string>;
+  remoteCursor: (Cursor) => Promise<string>;
+  catchRequestErrors: boolean;
 }

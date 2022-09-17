@@ -1,20 +1,9 @@
-import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
-import fetch, { Response } from 'node-fetch';
+import { CharacteristicValue, PlatformAccessory, Service } from 'homebridge';
+import fetch from 'node-fetch';
 
 import { YamahaAVRPlatform } from './platform.js';
 import { StorageService } from './storageService.js';
-import {
-  AccessoryContext,
-  BaseResponse,
-  Cursor,
-  Features,
-  Input,
-  MainZoneRemoteCode,
-  NameText,
-  Zone,
-  ZoneStatus,
-} from './types.js';
-import { getZoneStatus } from './utils/getZoneStatus.js';
+import { AccessoryContext, BaseResponse, Cursor, Input, MainZoneRemoteCode, Zone } from './types.js';
 
 interface CachedServiceData {
   Identifier: number;
@@ -30,7 +19,7 @@ export class YamahaAVRAccessory {
   private storageService: StorageService;
 
   private state: {
-    isPlaying: boolean; // TODO: Investigaste a better way of tracking "playing" state
+    isPlaying: boolean;
     inputs: Input[];
     connectionError: boolean;
   } = {
@@ -70,6 +59,36 @@ export class YamahaAVRAccessory {
 
     // regularly ping the AVR to keep power/input state syncronised
     setInterval(this.updateAVRState.bind(this), 5000);
+  }
+
+  formatAvrInputId(id) {
+    switch (id) {
+      case 'Tuner':
+        return 'TUNER';
+
+      case 'NET_RADIO':
+        return 'NET RADIO';
+
+      case 'Amazon_Music':
+        return 'Amazon Music';
+
+      case 'MusicCast_Link':
+        return 'MusicCast Link';
+
+      case 'V_AUX':
+        return 'V-AUX';
+
+      default:
+        return id.replace('_', '');
+    }
+  }
+
+  formatInputId(inputId: string) {
+    return inputId.replace(/[^a-z0-9]/gi, '').toUpperCase();
+  }
+
+  getActiveInputIndex(inputId: string) {
+    return this.state.inputs.map((input) => input.id).indexOf(this.formatInputId(inputId));
   }
 
   async init() {
@@ -131,12 +150,12 @@ export class YamahaAVRAccessory {
       const cachedService = await this.storageService.getItem<CachedServiceData>(input.id);
 
       try {
-        const inputService = this.accessory.addService(this.platform.Service.InputSource, input.text, input.id);
+        const inputService = this.accessory.addService(this.platform.Service.InputSource, input.name, input.id);
 
         inputService
           .setCharacteristic(this.platform.Characteristic.Identifier, i)
-          .setCharacteristic(this.platform.Characteristic.Name, input.text)
-          .setCharacteristic(this.platform.Characteristic.ConfiguredName, cachedService?.ConfiguredName || input.text)
+          .setCharacteristic(this.platform.Characteristic.Name, input.name)
+          .setCharacteristic(this.platform.Characteristic.ConfiguredName, cachedService?.ConfiguredName || input.name)
           .setCharacteristic(
             this.platform.Characteristic.IsConfigured,
             this.platform.Characteristic.IsConfigured.CONFIGURED,
@@ -159,7 +178,7 @@ export class YamahaAVRAccessory {
           .getCharacteristic(this.platform.Characteristic.ConfiguredName)
           .onGet(async (): Promise<CharacteristicValue> => {
             const cachedServiceGet = await this.storageService.getItem<CachedServiceData>(input.id);
-            return cachedServiceGet?.ConfiguredName || input.text;
+            return cachedServiceGet?.ConfiguredName || input.name;
           })
           .onSet((name: CharacteristicValue) => {
             const currentConfiguredName = inputService.getCharacteristic(
@@ -172,7 +191,7 @@ export class YamahaAVRAccessory {
 
             this.platform.log.debug(`Set input (${input.id}) name to ${name} `);
 
-            const configuredName = name || input.text;
+            const configuredName = name || input.name;
 
             inputService.updateCharacteristic(this.platform.Characteristic.ConfiguredName, configuredName);
 
@@ -211,12 +230,12 @@ export class YamahaAVRAccessory {
 
             this.storageService.setItemSync(input.id, {
               ConfiguredName:
-                inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value || input.text,
+                inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value || input.name,
               CurrentVisibilityState: targetVisibilityState,
             });
           });
 
-        inputService.getCharacteristic(this.platform.Characteristic.Name).onGet((): CharacteristicValue => input.text);
+        inputService.getCharacteristic(this.platform.Characteristic.Name).onGet((): CharacteristicValue => input.name);
 
         if (cachedService) {
           if (this.platform.Characteristic.CurrentVisibilityState.SHOWN !== cachedService.CurrentVisibilityState) {
@@ -228,7 +247,7 @@ export class YamahaAVRAccessory {
             );
           }
 
-          if (input.text !== cachedService.ConfiguredName && cachedService.ConfiguredName !== '') {
+          if (input.name !== cachedService.ConfiguredName && cachedService.ConfiguredName !== '') {
             this.platform.log.debug(`Restoring input ${input.id} configured name from cache`);
             inputService.setCharacteristic(this.platform.Characteristic.ConfiguredName, cachedService.ConfiguredName);
           }
@@ -239,7 +258,7 @@ export class YamahaAVRAccessory {
 
         try {
           // Cache Data
-          const name = inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value || input.text;
+          const name = inputService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value || input.name;
           const visibility = inputService.getCharacteristic(this.platform.Characteristic.CurrentVisibilityState).value;
 
           if (cachedService?.ConfiguredName === name && cachedService.CurrentVisibilityState === visibility) {
@@ -279,48 +298,54 @@ export class YamahaAVRAccessory {
 
   async updateInputSources() {
     try {
-      const featuresResponse = await fetch(`${this.baseApiUrl}/system/getFeatures`);
-      const features = (await featuresResponse.json()) as Features;
-      const zoneInputs = features.zone.find((zone) => zone.id === this.zone)?.input_list;
+      const availableInputs = await this.platform.YamahaAVR.getAvailableInputsWithNames();
 
-      if (!zoneInputs) {
-        throw new Error();
-      }
+      const inputs = [
+        ...Object.entries(availableInputs[0]).map(([id, name]) => ({
+          avrId: this.formatAvrInputId(id),
+          id: this.formatInputId(id),
+          name: name[0],
+        })),
+      ];
 
-      const getNameTextResponse = await fetch(`${this.baseApiUrl}/system/getNameText`);
-      const nameText = (await getNameTextResponse.json()) as NameText;
+      const features = this.platform.features
+        .map((id) => ({
+          avrId: this.formatAvrInputId(id),
+          id: this.formatInputId(id),
+          name: id.replace('_', ' '),
+        }))
+        .filter((feature) => !inputs.map((input) => input.id).includes(feature.id));
 
-      this.state.inputs = nameText.input_list.filter((input) => zoneInputs.includes(input.id));
+      this.state.inputs = [...inputs, ...features];
+
+      this.platform.log.debug('inputs', this.state.inputs);
     } catch {
       this.platform.log.error(`
-      Failed to get available inputs from ${this.platform.config.name}.
-      Please verify the AVR is connected and accessible at ${this.platform.config.ip}
-    `);
+          Failed to get available inputs from ${this.platform.config.name}.
+          Please verify the AVR is connected and accessible at ${this.platform.config.ip}
+        `);
     }
   }
 
   async updateAVRState() {
     try {
-      const zoneStatus = await getZoneStatus(this.platform, this.accessory, this.zone);
+      const basicInfo = await this.platform.YamahaAVR.getBasicInfo();
 
-      if (!zoneStatus) {
-        throw new Error();
-      }
-
-      this.platform.log.debug(`AVR PING`, { power: zoneStatus.power, input: zoneStatus.input });
-
-      this.service.updateCharacteristic(this.platform.Characteristic.Active, zoneStatus.power === 'on');
+      this.service.updateCharacteristic(
+        this.platform.Characteristic.Active,
+        basicInfo.isOn() ? this.platform.Characteristic.Active.ACTIVE : this.platform.Characteristic.Active.INACTIVE,
+      );
 
       this.service.updateCharacteristic(
         this.platform.Characteristic.ActiveIdentifier,
-        this.state.inputs.findIndex((input) => input.id === zoneStatus.input),
+        this.getActiveInputIndex(basicInfo.getCurrentInput()),
       );
 
       if (this.state.connectionError) {
         this.state.connectionError = false;
         this.platform.log.info(`Communication with Yamaha AVR at ${this.platform.config.ip} restored`);
       }
-    } catch (error) {
+    } catch {
       if (this.state.connectionError) {
         return;
       }
@@ -334,38 +359,22 @@ export class YamahaAVRAccessory {
   }
 
   async getPowerState(): Promise<CharacteristicValue> {
-    const zoneStatus = await getZoneStatus(this.platform, this.accessory, this.zone);
-
-    if (!zoneStatus) {
-      return false;
-    }
-
-    return zoneStatus.power === 'on';
+    return this.platform.YamahaAVR.isOn();
   }
 
-  async setPowerState(state: CharacteristicValue) {
-    try {
-      let setPowerResponse: Response;
-
-      if (state) {
-        setPowerResponse = await fetch(`${this.baseApiUrl}/${this.zone}/setPower?power=on`);
-      } else {
-        setPowerResponse = await fetch(`${this.baseApiUrl}/${this.zone}/setPower?power=standby`);
-      }
-
-      const responseJson = (await setPowerResponse.json()) as BaseResponse;
-
-      if (responseJson.response_code !== 0) {
-        throw new Error('Failed to set zone power');
-      }
-    } catch (error) {
-      this.platform.log.error((error as Error).message);
+  async setPowerState(isOn: CharacteristicValue) {
+    if (isOn) {
+      await this.platform.YamahaAVR.powerOff();
+      return;
     }
+
+    this.platform.YamahaAVR.powerOn();
   }
 
   async setRemoteKey(remoteKey: CharacteristicValue) {
     try {
       const sendRemoteCode = async (remoteKey: MainZoneRemoteCode) => {
+        // TODO: Work out a way to send IR Codes via XML API
         const sendIrCodeResponse = await fetch(`${this.baseApiUrl}/system/sendIrCode?code=${remoteKey}`);
         const responseJson = (await sendIrCodeResponse.json()) as BaseResponse;
 
@@ -375,22 +384,18 @@ export class YamahaAVRAccessory {
       };
 
       const controlCursor = async (cursor: Cursor) => {
-        const controlCursorResponse = await fetch(`${this.baseApiUrl}/${this.zone}/controlCursor?cursor=${cursor}`);
-        const responseJson = (await controlCursorResponse.json()) as BaseResponse;
-        if (responseJson.response_code !== 0) {
-          throw new Error('Failed to control cursor');
-        }
+        this.platform.YamahaAVR.remoteCursor(cursor);
       };
 
       switch (remoteKey) {
         case this.platform.Characteristic.RemoteKey.REWIND:
           this.platform.log.info('set Remote Key Pressed: REWIND');
-          sendRemoteCode(MainZoneRemoteCode.SEARCH_BACK);
+          this.platform.YamahaAVR.rewind();
           break;
 
         case this.platform.Characteristic.RemoteKey.FAST_FORWARD:
           this.platform.log.info('set Remote Key Pressed: FAST_FORWARD');
-          sendRemoteCode(MainZoneRemoteCode.SEARCH_FWD);
+          this.platform.YamahaAVR.skip();
           break;
 
         case this.platform.Characteristic.RemoteKey.NEXT_TRACK:
@@ -405,32 +410,32 @@ export class YamahaAVRAccessory {
 
         case this.platform.Characteristic.RemoteKey.ARROW_UP:
           this.platform.log.info('set Remote Key Pressed: ARROW_UP');
-          controlCursor('up');
+          controlCursor('Up');
           break;
 
         case this.platform.Characteristic.RemoteKey.ARROW_DOWN:
           this.platform.log.info('set Remote Key Pressed: ARROW_DOWN');
-          controlCursor('down');
+          controlCursor('Down');
           break;
 
         case this.platform.Characteristic.RemoteKey.ARROW_LEFT:
           this.platform.log.info('set Remote Key Pressed: ARROW_LEFT');
-          controlCursor('left');
+          controlCursor('Left');
           break;
 
         case this.platform.Characteristic.RemoteKey.ARROW_RIGHT:
           this.platform.log.info('set Remote Key Pressed: ARROW_RIGHT');
-          controlCursor('right');
+          controlCursor('Right');
           break;
 
         case this.platform.Characteristic.RemoteKey.SELECT:
           this.platform.log.info('set Remote Key Pressed: SELECT');
-          controlCursor('select');
+          controlCursor('Sel');
           break;
 
         case this.platform.Characteristic.RemoteKey.BACK:
           this.platform.log.info('set Remote Key Pressed: BACK');
-          controlCursor('return');
+          controlCursor('Return');
           break;
 
         case this.platform.Characteristic.RemoteKey.EXIT:
@@ -441,9 +446,9 @@ export class YamahaAVRAccessory {
         case this.platform.Characteristic.RemoteKey.PLAY_PAUSE:
           this.platform.log.info('set Remote Key Pressed: PLAY_PAUSE');
           if (this.state.isPlaying) {
-            sendRemoteCode(MainZoneRemoteCode.PAUSE);
+            this.platform.YamahaAVR.pause();
           } else {
-            sendRemoteCode(MainZoneRemoteCode.PLAY);
+            this.platform.YamahaAVR.play();
           }
 
           this.state.isPlaying = !this.state.isPlaying;
@@ -467,34 +472,15 @@ export class YamahaAVRAccessory {
 
   async setVolume(direction: CharacteristicValue) {
     try {
-      const zoneStatusResponse = await fetch(`${this.baseApiUrl}/${this.zone}/getStatus`);
-      const zoneStatus = (await zoneStatusResponse.json()) as ZoneStatus;
-
-      if (zoneStatus.response_code !== 0) {
-        throw new Error('Failed to set zone volume');
-      }
-
-      const currentVolume = zoneStatus.volume;
-      const volumeStep = 5;
-
-      let setVolumeResponse: Response;
+      const basicInfo = await this.platform.YamahaAVR.getBasicInfo();
+      const volume = basicInfo.getVolume();
 
       if (direction === 0) {
-        this.platform.log.info('Volume Up', currentVolume + volumeStep);
-        setVolumeResponse = await fetch(
-          `${this.baseApiUrl}/${this.zone}/setVolume?power=${currentVolume + volumeStep}`,
-        );
+        this.platform.log.info('Volume Up', (volume + 5) / 10);
+        this.platform.YamahaAVR.volumeUp(5);
       } else {
-        this.platform.log.info('Volume Down', currentVolume - volumeStep);
-        setVolumeResponse = await fetch(
-          `${this.baseApiUrl}/${this.zone}/setVolume?power=${currentVolume - volumeStep}`,
-        );
-      }
-
-      const responseJson = (await setVolumeResponse.json()) as BaseResponse;
-
-      if (responseJson.response_code !== 0) {
-        throw new Error('Failed to set zone volume');
+        this.platform.log.info('Volume Down', (volume - 5) / 10);
+        this.platform.YamahaAVR.volumeDown(5);
       }
     } catch (error) {
       this.platform.log.error((error as Error).message);
@@ -502,33 +488,23 @@ export class YamahaAVRAccessory {
   }
 
   async getInputState(): Promise<CharacteristicValue> {
-    const zoneStatus = await getZoneStatus(this.platform, this.accessory, this.zone);
+    try {
+      const basicInfo = await this.platform.YamahaAVR.getBasicInfo();
 
-    if (!zoneStatus) {
+      this.platform.log.debug(`Current input: ${basicInfo.getCurrentInput()}`);
+
+      return this.getActiveInputIndex(basicInfo.getCurrentInput());
+    } catch (error) {
+      this.platform.log.error((error as Error).message);
       return 0;
     }
-
-    this.platform.log.info(`Current ${this.zone} input: ${zoneStatus.input}`);
-
-    return this.state.inputs.findIndex((input) => input.id === zoneStatus.input);
   }
 
   async setInputState(inputIndex: CharacteristicValue) {
     try {
-      if (typeof inputIndex !== 'number') {
-        return;
-      }
-
-      const setInputResponse = await fetch(
-        `${this.baseApiUrl}/${this.zone}/setInput?input=${this.state.inputs[inputIndex].id}`,
-      );
-      const responseJson = (await setInputResponse.json()) as BaseResponse;
-
-      if (responseJson.response_code !== 0) {
-        throw new Error('Failed to set zone input');
-      }
-
-      this.platform.log.info(`Set input: ${this.state.inputs[inputIndex].id}`);
+      const input: Input = this.state.inputs[inputIndex as number];
+      this.platform.YamahaAVR.setInputTo(input.avrId);
+      this.platform.log.info(`Set input: ${input.id}`);
     } catch (error) {
       this.platform.log.error((error as Error).message);
     }

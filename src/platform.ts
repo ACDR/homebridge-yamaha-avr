@@ -1,25 +1,27 @@
 import {
   API,
+  Characteristic,
   IndependentPlatformPlugin,
   Logger,
+  PlatformAccessory,
   PlatformConfig,
   Service,
-  Characteristic,
-  PlatformAccessory,
 } from 'homebridge';
-import fetch from 'node-fetch';
+import Yamaha from 'yamaha-nodejs';
 
 import { YamahaAVRAccessory } from './accessory.js';
-import { YamahaVolumeAccessory } from './volumeAccessory.js';
-import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
-import { AccessoryContext, DeviceInfo, Features, Zone } from './types.js';
 import { YamahaPureDirectAccessory } from './pureDirectAccessory.js';
+import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
+import { AccessoryContext, YamahaAPI, Zone } from './types.js';
+import { YamahaVolumeAccessory } from './volumeAccessory.js';
 
 export class YamahaAVRPlatform implements IndependentPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
   public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
   public readonly platformAccessories: PlatformAccessory[] = [];
   public readonly externalAccessories: PlatformAccessory[] = [];
+  public readonly YamahaAVR: YamahaAPI = new Yamaha(this.config.ip);
+  public readonly features: string[] = [];
 
   constructor(public readonly log: Logger, public readonly config: PlatformConfig, public readonly api: API) {
     this.log.debug('Finished initializing platform:', this.config.name);
@@ -30,6 +32,7 @@ export class YamahaAVRPlatform implements IndependentPlatformPlugin {
         return;
       }
 
+      this.YamahaAVR.catchRequestErrors = false;
       this.discoverAVR();
     });
   }
@@ -40,44 +43,77 @@ export class YamahaAVRPlatform implements IndependentPlatformPlugin {
   }
 
   async discoverAVR() {
-    try {
-      const baseApiUrl = `http://${this.config.ip}/YamahaExtendedControl/v1`;
-      const deviceInfoResponse = await fetch(`${baseApiUrl}/system/getDeviceInfo`);
-      const deviceInfo = (await deviceInfoResponse.json()) as DeviceInfo;
+    this.YamahaAVR.getSystemConfig()
+      .then(async (systemConfig) => {
+        const config = {
+          systemId: systemConfig.YAMAHA_AV.System[0].Config[0].System_ID[0],
+          modelName: systemConfig.YAMAHA_AV.System[0].Config[0].Model_Name[0],
+          firmwareVersion: systemConfig.YAMAHA_AV.System[0].Config[0].Version[0],
+        };
 
-      const featuresResponse = await fetch(`${baseApiUrl}/system/getFeatures`);
-      const features = (await featuresResponse.json()) as Features;
+        const featuresXML = systemConfig.YAMAHA_AV.System[0].Config[0].Feature_Existence[0];
 
-      if (deviceInfo.response_code !== 0) {
-        throw new Error();
-      }
+        for (const feature in featuresXML) {
+          if (!feature.includes('Zone') && featuresXML[feature].includes('1')) {
+            this.features.push(feature);
+          }
+        }
 
-      const device: AccessoryContext['device'] = {
-        displayName: this.config.name ?? `Yamaha ${deviceInfo.model_name}`,
-        modelName: deviceInfo.model_name,
-        systemId: deviceInfo.system_id,
-        firmwareVersion: deviceInfo.system_version,
-        baseApiUrl,
-      };
+        const device = {
+          ...config,
+          displayName: this.config.name ?? `Yamaha ${config.modelName}`,
+        };
 
-      if (this.config.enablePureDirectSwitch) {
-        await this.createPureDirectAccessory(device);
-      }
+        await this.createZoneAccessories(device, 'main');
 
-      await this.createZoneAccessories(device, 'main');
+        if (this.externalAccessories.length > 0) {
+          this.api.publishExternalAccessories(PLUGIN_NAME, this.externalAccessories);
+        }
+      })
+      .catch(() => {
+        this.log.error(`
+          Failed to get system config from ${this.config.name}. Please verify the AVR is connected and accessible at ${this.config.ip}
+        `);
+      });
 
-      features.zone.length > 1 && (await this.createZoneAccessories(device, 'zone2'));
-      features.zone.length > 2 && (await this.createZoneAccessories(device, 'zone3'));
-      features.zone.length > 3 && (await this.createZoneAccessories(device, 'zone4'));
+    // try {
+    //   const baseApiUrl = `http://${this.config.ip}/YamahaExtendedControl/v1`;
+    //   const deviceInfoResponse = await fetch(`${baseApiUrl}/system/getDeviceInfo`);
+    //   const deviceInfo = (await deviceInfoResponse.json()) as DeviceInfo;
 
-      if (this.externalAccessories.length > 0) {
-        this.api.publishExternalAccessories(PLUGIN_NAME, this.externalAccessories);
-      }
-    } catch {
-      this.log.error(`
-        Failed to get system config from ${this.config.name}. Please verify the AVR is connected and accessible at ${this.config.ip}
-      `);
-    }
+    //   const featuresResponse = await fetch(`${baseApiUrl}/system/getFeatures`);
+    //   const features = (await featuresResponse.json()) as Features;
+
+    //   if (deviceInfo.response_code !== 0) {
+    //     throw new Error();
+    //   }
+
+    //   const device: AccessoryContext['device'] = {
+    //     displayName: this.config.name ?? `Yamaha ${deviceInfo.model_name}`,
+    //     modelName: deviceInfo.model_name,
+    //     systemId: deviceInfo.system_id,
+    //     firmwareVersion: deviceInfo.system_version,
+    //     baseApiUrl,
+    //   };
+
+    //   if (this.config.enablePureDirectSwitch) {
+    //     await this.createPureDirectAccessory(device);
+    //   }
+
+    //   await this.createZoneAccessories(device, 'main');
+
+    //   features.zone.length > 1 && (await this.createZoneAccessories(device, 'zone2'));
+    //   features.zone.length > 2 && (await this.createZoneAccessories(device, 'zone3'));
+    //   features.zone.length > 3 && (await this.createZoneAccessories(device, 'zone4'));
+
+    //   if (this.externalAccessories.length > 0) {
+    //     this.api.publishExternalAccessories(PLUGIN_NAME, this.externalAccessories);
+    //   }
+    // } catch {
+    //   this.log.error(`
+    //     Failed to get system config from ${this.config.name}. Please verify the AVR is connected and accessible at ${this.config.ip}
+    //   `);
+    // }
   }
 
   async createZoneAccessories(device, zone) {
@@ -88,9 +124,9 @@ export class YamahaAVRPlatform implements IndependentPlatformPlugin {
     const avrAccessory = await this.createAVRAccessory(device, zone);
     this.externalAccessories.push(avrAccessory);
 
-    if (this.config.volumeAccessoryEnabled) {
-      await this.createVolumeAccessory(device, zone);
-    }
+    // if (this.config.volumeAccessoryEnabled) {
+    //   await this.createVolumeAccessory(device, zone);
+    // }
   }
 
   async createAVRAccessory(device: AccessoryContext['device'], zone: Zone['id']): Promise<PlatformAccessory> {
