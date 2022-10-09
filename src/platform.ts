@@ -13,7 +13,6 @@ import { YamahaAVRAccessory } from './accessory.js';
 import { YamahaPureDirectAccessory } from './pureDirectAccessory.js';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
 import { AccessoryContext, YamahaAPI, Zone } from './types.js';
-import { YamahaVolumeAccessory } from './volumeAccessory.js';
 
 export class YamahaAVRPlatform implements IndependentPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
@@ -123,10 +122,6 @@ export class YamahaAVRPlatform implements IndependentPlatformPlugin {
 
     const avrAccessory = await this.createAVRAccessory(device, zone);
     this.externalAccessories.push(avrAccessory);
-
-    // if (this.config.volumeAccessoryEnabled) {
-    //   await this.createVolumeAccessory(device, zone);
-    // }
   }
 
   async createAVRAccessory(device: AccessoryContext['device'], zone: Zone['id']): Promise<PlatformAccessory> {
@@ -149,33 +144,6 @@ export class YamahaAVRPlatform implements IndependentPlatformPlugin {
     new YamahaAVRAccessory(this, accessory, zone);
 
     return accessory;
-  }
-
-  async createVolumeAccessory(device: AccessoryContext['device'], zone: Zone['id']): Promise<void> {
-    let uuid = `${device.systemId}_${this.config.ip}_volume`;
-
-    if (zone !== 'main') {
-      uuid = `${uuid}_${zone}`;
-    }
-
-    uuid = this.api.hap.uuid.generate(uuid);
-
-    const accessory = new this.api.platformAccessory<AccessoryContext>(
-      `AVR Vol. ${zone}`,
-      uuid,
-      this.api.hap.Categories.FAN,
-    );
-
-    accessory.context = { device };
-
-    new YamahaVolumeAccessory(this, accessory, zone);
-
-    const existingAccessory = this.platformAccessories.find((accessory) => accessory.UUID === uuid);
-    if (existingAccessory) {
-      this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
-    }
-
-    this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
   }
 
   async createPureDirectAccessory(device: AccessoryContext['device']): Promise<void> {
